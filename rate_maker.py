@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 np.random.seed(0)
-N_USER = 5
+N_USER = 100
 N_RESOURCE = 10
 N_CASE = 100
 
@@ -16,7 +16,6 @@ INF = 10**7
 
 
 def main():
-    band_widths = 40*np.ones(N_RESOURCE)
     user_positions = generate_user_pos()
     user2ap_dist_l2, _ = get_distances(user_positions)
     get_snr(user2ap_dist_l2)
@@ -58,7 +57,7 @@ def get_snr(user2ap_dist_l2):
     tx_power_linear = 0.001 * db2pow(TX_POWER)
     noise_power_linear = 0.001 * db2pow(NOISE_POWER)
     snr = Rayleigh_coeff_G * (tx_power_linear/noise_power_linear)
-    # print(snr)
+    print(snr)
     snr = snr + (INF-snr)*(snr>INF)
 
 
@@ -89,8 +88,6 @@ def plot_positions(user_positions):
     plt.gca().set_aspect('equal')
     plt.tight_layout()
     plt.show()
-
-
 
 
 if __name__=="__main__":

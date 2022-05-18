@@ -13,7 +13,7 @@ N_case = 100;
 % bandwidth_list = 40*ones(N_resource,1)+40*[ones(N_resource/2,1); zeros(N_resource/2,1)];
 bandwidth_list = 40*ones(N_resource,1);
 [N_BW, ~] = size(bandwidth_list);
-MA_limit = 7;
+MA_limit = N_resource;
 
 % 1,2차원은 rate 정보, 3차원은 index.
 for i = 1:N_case
