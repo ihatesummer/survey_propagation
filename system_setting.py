@@ -2,33 +2,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 np.random.seed(0)
-N_USER = 100
-N_RESOURCE = 10
-N_CASE = 100
-
-AP_POSITIONS = np.array([[0, 0], [10, 0], [0, 10], [10, 10]])
+N_USER = 10
+AP_POSITIONS = np.array([[0, 0], [10, 0]])
 N_AP = np.size(AP_POSITIONS, axis=0)
 MAX_DISTANCE = 10
 ETA = 3
-TX_POWER = -15 # dB
-NOISE_POWER = -80 # dB
-INF = 10**7
+TX_POWER = -15 # dBm
+NOISE_POWER = -80 # dBm
 
 
 def main():
-    user_positions = generate_user_pos()
-    user2ap_dist_l2, _ = get_distances(user_positions)
-    get_snr(user2ap_dist_l2)
+    user_positions = generate_user_positions()
+    user2ap_distances, _ = get_distances(user_positions)
+    snr = get_snr(user2ap_distances*1000)
+    np.save("user_positions.npy", user_positions)
+    np.save("user2ap_distances.npy", user2ap_distances)
+    np.save("snr.npy", snr)
     plot_positions(user_positions)
-
-
-def generate_user_pos():
-    x_min, x_max, y_min, y_max = get_map_boundaries()
-    usr_pos_x = np.random.uniform(x_min, x_max, N_USER)
-    usr_pos_y = np.random.uniform(y_min, y_max, N_USER)
-    usr_pos = np.column_stack((usr_pos_x, usr_pos_y))
-
-    return usr_pos
 
 
 def get_map_boundaries():
@@ -39,30 +29,37 @@ def get_map_boundaries():
     return x_min, x_max, y_min, y_max
 
 
+def generate_user_positions():
+    x_min, x_max, y_min, y_max = get_map_boundaries()
+    pos_x = np.random.uniform(x_min, x_max, N_USER)
+    pos_y = np.random.uniform(y_min, y_max, N_USER)
+    user_positions = np.column_stack((pos_x, pos_y))
+
+    return user_positions
+
+
 def get_distances(user_positions):
     xy_dist = np.zeros(shape=(N_AP, N_USER, 2))
-    dist_l2 = np.zeros(shape=(N_AP, N_USER))
-    angle = np.zeros(shape=(N_AP, N_USER))
+    distances = np.zeros(shape=(N_AP, N_USER))
+    angles = np.zeros(shape=(N_AP, N_USER))
 
     for ap_idx, ap_position in enumerate(AP_POSITIONS):
         xy_dist[ap_idx, :, :] = user_positions - ap_position
-        dist_l2[ap_idx, :] = np.linalg.norm(xy_dist[ap_idx, :, :], 2, axis=1)
-        angle[ap_idx, :] = np.arctan2(xy_dist[ap_idx, :, 1], xy_dist[ap_idx, :, 0])
-    return dist_l2, angle
+        distances[ap_idx, :] = np.linalg.norm(xy_dist[ap_idx, :, :], 2, axis=1)
+        angles[ap_idx, :] = np.arctan2(xy_dist[ap_idx, :, 1], xy_dist[ap_idx, :, 0])
+    return distances, angles
 
 
-def get_snr(user2ap_dist_l2):
-    Rayleigh_coeff_H = np.sqrt(user2ap_dist_l2**(-ETA))
-    Rayleigh_coeff_G = (np.abs(Rayleigh_coeff_H))**2
-    tx_power_linear = 0.001 * db2pow(TX_POWER)
-    noise_power_linear = 0.001 * db2pow(NOISE_POWER)
-    snr = Rayleigh_coeff_G * (tx_power_linear/noise_power_linear)
-    print(snr)
-    snr = snr + (INF-snr)*(snr>INF)
+def db2pow(power_dBm):
+    return 10**(power_dBm/10) * 0.001
 
 
-def db2pow(power_db):
-    return 10**(power_db/10)
+def get_snr(user2ap_distances):
+    Rayleigh_coeff = user2ap_distances**(-ETA)
+    tx_power_linear = db2pow(TX_POWER)
+    noise_power_linear = db2pow(NOISE_POWER)
+    snr = Rayleigh_coeff * (tx_power_linear/noise_power_linear)
+    return snr
 
 
 def plot_positions(user_positions):
@@ -74,9 +71,6 @@ def plot_positions(user_positions):
     for i, ap_pos in enumerate(AP_POSITIONS):
         ax.plot(ap_pos[0], ap_pos[1], "D",
                 markersize=8, color=bs_colors[i], label=f"$BS_{i}$")
-        points = np.linspace(ap_pos[0]-MAX_DISTANCE,
-                             ap_pos[0]+MAX_DISTANCE,
-                             100)
         circle = plt.Circle((ap_pos[0], ap_pos[1]), MAX_DISTANCE,
                             color=bs_colors[i], fill=False)
         ax.add_patch(circle)
@@ -84,9 +78,9 @@ def plot_positions(user_positions):
         ax.plot(user_pos[0], user_pos[1],
                 marker=f"${i}$", markersize=8, color='black')
     ax.grid()
-    # ax.legend()
     plt.gca().set_aspect('equal')
     plt.tight_layout()
+    plt.savefig("APs_and_users.png")
     plt.show()
 
 
