@@ -45,8 +45,10 @@ def get_distances(user_positions):
 
     for ap_idx, ap_position in enumerate(AP_POSITIONS):
         xy_dist[ap_idx, :, :] = user_positions - ap_position
-        distances[ap_idx, :] = np.linalg.norm(xy_dist[ap_idx, :, :], 2, axis=1)
-        angles[ap_idx, :] = np.arctan2(xy_dist[ap_idx, :, 1], xy_dist[ap_idx, :, 0])
+        distances[ap_idx, :] = np.linalg.norm(
+            xy_dist[ap_idx, :, :], 2, axis=1)
+        angles[ap_idx, :] = np.arctan2(
+            xy_dist[ap_idx, :, 1], xy_dist[ap_idx, :, 0])
     return distances, angles
 
 
@@ -70,13 +72,17 @@ def plot_positions(user_positions):
     ax.set_ylim(y_min, y_max)
     for i, ap_pos in enumerate(AP_POSITIONS):
         ax.plot(ap_pos[0], ap_pos[1], "D",
-                markersize=8, color=bs_colors[i], label=f"$BS_{i}$")
-        circle = plt.Circle((ap_pos[0], ap_pos[1]), MAX_DISTANCE,
-                            color=bs_colors[i], fill=False)
+                markersize=8, color=bs_colors[i],
+                label=f"$BS_{i}$")
+        circle = plt.Circle((ap_pos[0], ap_pos[1]),
+                            MAX_DISTANCE,
+                            color=bs_colors[i],
+                            fill=False)
         ax.add_patch(circle)
     for i, user_pos in enumerate(user_positions):
         ax.plot(user_pos[0], user_pos[1],
-                marker=f"${i}$", markersize=8, color='black')
+                marker=f"${i}$", markersize=8,
+                color='black')
     ax.grid()
     plt.gca().set_aspect('equal')
     plt.tight_layout()

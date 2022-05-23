@@ -1,9 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from itertools import permutations
-from system_setting import (N_USER, AP_POSITIONS, N_AP,
-                            MAX_DISTANCE, ETA,
-                            TX_POWER, NOISE_POWER)
+from system_setting import (N_USER, AP_POSITIONS,
+                            N_AP, MAX_DISTANCE)
 N_RESOURCE = 10
 N_CASE = 100
 np.random.seed(0)
@@ -16,8 +15,13 @@ def main():
 
     user_list, user_pair_list = get_user_lists()
     x = merge_user_lists(user_list, user_pair_list)
-    idx_test = get_neighbor_indices(x, 20)
-    print(idx_test)
+
+    # Demo #########
+    idx_neighbors = get_neighbor_indices(x, 86)
+    for ap in range(N_AP):
+        is_in_range = check_range(AP_POSITIONS[ap], user_positions[1])
+        print(is_in_range)
+    ################
 
 
 def get_user_lists():
@@ -25,6 +29,15 @@ def get_user_lists():
     perm_idx = permutations(user_list, r=2)
     user_pair_list = np.array(list(perm_idx))
     return user_list, user_pair_list
+
+
+def merge_user_lists(user_list, user_pair_list):
+    x = []
+    for user in user_list:
+        x.append(user.tolist())
+    for user_pair in user_pair_list:
+        x.append(user_pair.tolist())
+    return x
 
 
 def get_neighbor_indices(x, idx):
@@ -40,23 +53,19 @@ def get_neighbor_indices(x, idx):
     else:
         user1 = x[idx][0]
         user2 = x[idx][1]
-        user1_neighbor_idx = get_neighbor_indices(x, user1)
-        user2_neighbor_idx = get_neighbor_indices(x, user2)
-        user1_neighbor_idx.remove(idx)
-        user2_neighbor_idx.remove(idx)
+        neighbor_idx_1 = get_neighbor_indices(x, user1)
+        neighbor_idx_2 = get_neighbor_indices(x, user2)
+        neighbor_idx_1.remove(idx)
+        neighbor_idx_2.remove(idx)
 
-        all_neighbor_idx = user1_neighbor_idx + user2_neighbor_idx
-        all_neighbor_idx.sort()
-        return all_neighbor_idx
+        neighbor_idx_both = [user1, user2] + neighbor_idx_1 + neighbor_idx_2
+        neighbor_idx_both.sort()
+        return neighbor_idx_both
 
 
-def merge_user_lists(user_list, user_pair_list):
-    x = []
-    for user in user_list:
-        x.append(user.tolist())
-    for user_pair in user_pair_list:
-        x.append(user_pair.tolist())
-    return x
+def check_range(ap_position, user_position):
+    distance = np.linalg.norm(ap_position - user_position, 2)
+    return MAX_DISTANCE >= distance
 
 
 if __name__=="__main__":

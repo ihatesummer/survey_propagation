@@ -14,7 +14,6 @@
   - $\text{Rayleigh coefficient}=d^{-\eta}$
   - 자세한 채널 세팅은 [여기](https://ecewireless.blogspot.com/2020/04/how-to-simulate-ber-capacity-and-outage.html)를 참고했다고 함
 - TX_POWER, NOISE_POWER: dBm 단위
-- INF: 최대
 ## 함수, 변수
 - main()
   - user_positions: user들의 위치
@@ -49,3 +48,24 @@
 - N_CASE: 실험 반복 횟수
   - 알고리즘이 돌아가는것을 확인 한 후 나중에 반복 실험을 위해 일단 선언해둠
 ## 함수, 변수
+- main()
+  - user_positions: system_setting.py에서 저장한걸 load
+  - user2ap_distances: system_setting.py에서 저장한걸 load
+  - snr: system_setting.py에서 저장한걸 load
+  - user_list: user들의 번호 목록
+    - $\text{N\_USER}$차원 numpy
+  - user_pair_list: user들의 조합을 나열한 목록
+    - $\operatorname{Perm}(\text{N\_USER},2)$차원 numpy
+  - x: user_list와 user_pair_list를 순서대로 나열한 목록
+    - $\text{N\_USER} + \operatorname{Perm}(\text{N\_USER},2)$차원 python list
+    - numpy는 요소들의 데이터형과 차원이 똑같아야 하는 제약이 있어 python 기본 list로 구현함
+- get_user_lists()
+  - user 목록과 user pair 목록을 각각 생성, 반환
+- mer_user_lists(user_list, user_pair_list)
+  - user_list와 user_pair_list의 모든 요소를 python list로 변환하고 이어붙임
+- get_neighbor_indices(x, idx)
+  - x[idx]의 이웃들의 index들을 반환
+  - idx가 한 user를 가리킬 경우와 두 user들을 가리키는 경우를 분리해 구현함
+  - 후자의 경우 두 user를 분리한 후 동일 함수를 재귀적으로 호출함
+- check_range(ap_position, user_position)
+  - user가 AP의 통신 범위에 있는지 확인해서 bool 형태로 반환
