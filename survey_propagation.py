@@ -15,9 +15,8 @@ def main():
 
     user_list, user_pair_list = get_user_lists()
     x = merge_user_lists(user_list, user_pair_list)
-
     # Demo #########
-    idx_neighbors = get_neighbor_indices(x, 86)
+    idx_neighbors = get_neighbor_indices(x, 10)
     for ap in range(N_AP):
         is_in_range = check_range(AP_POSITIONS[ap], user_positions[1])
         print(is_in_range)

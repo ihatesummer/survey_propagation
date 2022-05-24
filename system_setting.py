@@ -71,7 +71,7 @@ def plot_positions(user_positions):
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
     for i, ap_pos in enumerate(AP_POSITIONS):
-        ax.plot(ap_pos[0], ap_pos[1], "D",
+        ax.plot(ap_pos[0], ap_pos[1], marker="D",
                 markersize=8, color=bs_colors[i],
                 label=f"$BS_{i}$")
         circle = plt.Circle((ap_pos[0], ap_pos[1]),
