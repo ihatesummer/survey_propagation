@@ -5,6 +5,8 @@ from system_setting import (N_USER, AP_POSITIONS,
                             N_AP, MAX_DISTANCE)
 N_RESOURCE = 10
 N_CASE = 100
+N_ITER = 10
+EPS = 10**-6
 np.random.seed(0)
 
 
@@ -15,12 +17,29 @@ def main():
 
     user_list, user_pair_list = get_user_lists()
     x = merge_user_lists(user_list, user_pair_list)
-    # Demo #########
-    idx_neighbors = get_neighbor_indices(x, 10)
-    for ap in range(N_AP):
-        is_in_range = check_range(AP_POSITIONS[ap], user_positions[1])
-        print(is_in_range)
-    ################
+    dimension_i = len(x)
+    y = get_y(x, user_positions, snr)
+    allocation = np.zeros(shape=(N_ITER, dimension_i))
+    alpha_tilde = np.zeros(shape=(N_ITER, dimension_i, N_RESOURCE))
+    alpha_bar = np.zeros(shape=(N_ITER, dimension_i, N_RESOURCE))
+    rho_tilde = np.zeros(shape=(N_ITER, dimension_i, N_RESOURCE))
+    rho_bar = np.zeros(shape=(N_ITER, dimension_i, N_RESOURCE))
+
+    for t in range(1, N_ITER):
+        rho_tilde[t], rho_bar[t] = update_rho(
+            y, alpha_tilde[t], alpha_bar[t])
+        # if t < N_ITER-1:
+        #     alpha_tilde[t+1] = update_alpha_tilde()
+        #     alpha_bar[t+1] = update_alpha_bar()
+        # allocation[t] = make_decision()
+
+        # is_converged = check_convergence(
+        #     alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
+        # if is_converged:
+        #     print(f"converged at t={t}")
+        #     for i in range(dimension_i):
+        #         print(f"{x[i]} - {allocation[t, i]}")
+        return
 
 
 def get_user_lists():
@@ -37,6 +56,20 @@ def merge_user_lists(user_list, user_pair_list):
     for user_pair in user_pair_list:
         x.append(user_pair.tolist())
     return x
+
+
+def get_y(x, user_positions, snr):
+    y = np.zeros(shape=(len(x), N_RESOURCE))
+    for i in range(len(x)):
+        if i < N_USER:
+            within_AP_range = np.zeros(N_AP, dtype=bool)
+            for j in range(N_AP):
+                within_AP_range[j] = check_range(AP_POSITIONS[j], user_positions[i])
+            # print(within_AP_range)
+        else:
+            user_1, user_2 = x[i]
+            # print(user_1, user_2)
+    return y
 
 
 def get_neighbor_indices(x, idx):
@@ -65,6 +98,37 @@ def get_neighbor_indices(x, idx):
 def check_range(ap_position, user_position):
     distance = np.linalg.norm(ap_position - user_position, 2)
     return MAX_DISTANCE >= distance
+
+
+def update_rho(y, alpha_tilde_now, alpha_bar_now):
+    dim_x = np.size(y, axis=0)
+    rho_bar_now = np.zeros(shape=(dim_x, N_RESOURCE))
+    rho_tilde_now = np.zeros(shape=(dim_x, N_RESOURCE))
+    for i in range(dim_x):
+        for r in range(N_RESOURCE):
+            alpha_tilde_row_except_ir = np.delete(
+                alpha_tilde_now[i], r)
+            y_row_except_ir = np.delete(y[i], r)
+            rho_tilde_now[i, r] = y[i, r] - np.max(
+                y_row_except_ir + alpha_tilde_row_except_ir)
+            
+            alpha_bar_row_except_ir = np.delete(
+                alpha_bar_now[i], r)
+            rho_bar_now[i, r] = rho_tilde_now[i, r] + \
+                np.sum(alpha_bar_row_except_ir) - y[i, r]
+    return rho_bar_now, rho_tilde_now
+
+
+def update_alpha():
+    pass
+
+
+def make_decision():
+    pass
+
+
+def check_convergence():
+    pass
 
 
 if __name__=="__main__":
