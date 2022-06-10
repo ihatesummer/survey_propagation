@@ -7,7 +7,7 @@ np.random.seed(0)
 N_USER = 3
 AP_POSITIONS = np.array([[0, 0], [10, 0]])
 N_AP = np.size(AP_POSITIONS, axis=0)
-N_RESOURCE = 3
+N_RESOURCE = 2
 MAX_DISTANCE = 10
 ETA = 3
 TX_POWER = -15 # dBm
@@ -111,19 +111,6 @@ def get_y(x, ap2user_distances):
                     comparison_list.append(snir1 + snir2)
                 y[i, r] = np.max(comparison_list)
     return y
-
-
-# def db2pow(power_dBm):
-#     return 10**(power_dBm/10) * 0.001
-
-
-# def get_snr(user2ap_distances):
-#     user2ap_distances *= 1000
-#     Rayleigh_coeff = user2ap_distances**(-ETA)
-#     tx_power_linear = db2pow(TX_POWER)
-#     noise_power_linear = db2pow(NOISE_POWER)
-#     snr = Rayleigh_coeff * (tx_power_linear/noise_power_linear)
-#     return snr
 
 
 def plot_positions(user_positions):

@@ -6,7 +6,7 @@ from system_setting import (N_USER, AP_POSITIONS,
                             N_RESOURCE, get_x)
 
 N_CASE = 100
-N_ITER = 100
+N_ITER = 20
 EPS = 10**-6
 DAMP = 0.2 # 0 for no damp (full change), 1 for full damp (no change)
 np.random.seed(0)
@@ -31,9 +31,9 @@ def main():
         rho_tilde[t] = DAMP*rho_tilde[t-1] + (1-DAMP)*rho_tilde[t]
         rho_bar[t] = DAMP*rho_bar[t-1] + (1-DAMP)* rho_bar[t]
         # print("rho_tilde,\n", rho_tilde[t])
-        # np.savetxt(f"rho_tilde_{t}.csv", rho_tilde[t], delimiter=',')
+        np.savetxt(f"rho_tilde_{t}.csv", rho_tilde[t], delimiter=',')
         # print("rho_bar,\n", rho_bar[t])
-        # np.savetxt(f"rho_bar_{t}.csv", rho_bar[t], delimiter=',')
+        np.savetxt(f"rho_bar_{t}.csv", rho_bar[t], delimiter=',')
         if t < N_ITER-1:
             alpha_tilde[t+1], alpha_bar[t+1] = update_alpha(
                 x, rho_tilde[t], rho_bar[t])
@@ -42,8 +42,8 @@ def main():
 
             # print("alpha_t ilde,\n", alpha_tilde[t+1, 0])
             # print("alpha_bar,\n", alpha_bar[t+1, 0])
-            # np.savetxt(f"alpha_tilde_{t+1}.csv", alpha_tilde[t+1], delimiter=',')
-            # np.savetxt(f"alpha_bar_{t+1}.csv", alpha_bar[t+1], delimiter=',')
+            np.savetxt(f"alpha_tilde_{t+1}.csv", alpha_tilde[t+1], delimiter=',')
+            np.savetxt(f"alpha_bar_{t+1}.csv", alpha_bar[t+1], delimiter=',')
 
         allocation[t] = make_decision(x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
         print_allocation(x, t, allocation[t])
