@@ -7,7 +7,7 @@ np.random.seed(0)
 N_USER = 3
 AP_POSITIONS = np.array([[0, 0], [10, 0]])
 N_AP = np.size(AP_POSITIONS, axis=0)
-N_RESOURCE = 2
+N_RESOURCE = 3
 MAX_DISTANCE = 10
 ETA = 3
 TX_POWER = -15 # dBm
@@ -104,10 +104,10 @@ def get_y(x, ap2user_distances):
                     ap1, ap2 = ap_pair
                     snir1 = np.log2(
                         1 + (G_anr[ap1, user1, r]/ap2user_distances[ap1, user1]**3)
-                            / (G_anr[ap2, user1, r]/ap2user_distances[ap2, user1]**3 + 1))
+                            / (G_anr[ap2, user1, r]/ap2user_distances[ap2, user1]**3 + (STD_HAT**2)))
                     snir2 = np.log2(
                         1 + (G_anr[ap2, user2, r]/ap2user_distances[ap2, user2]**3)
-                            / (G_anr[ap1, user2, r]/ap2user_distances[ap1, user2]**3 + 1))
+                            / (G_anr[ap1, user2, r]/ap2user_distances[ap1, user2]**3 + (STD_HAT**2)))
                     comparison_list.append(snir1 + snir2)
                 y[i, r] = np.max(comparison_list)
     return y
