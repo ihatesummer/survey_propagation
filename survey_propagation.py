@@ -12,11 +12,8 @@ np.random.seed(0)
 
 
 def main():
-    # user_positions = np.load("user_positions.npy")
-    # user2ap_distances = np.load("ap2user_distances.npy")
     x = get_x()
     y = np.load("y.npy")
-    y = y / np.max(y)
     dim_x = len(x)
     print("y,\n", y)
     allocation = np.zeros(shape=(N_ITER, dim_x))
@@ -30,25 +27,19 @@ def main():
             y, alpha_tilde[t], alpha_bar[t])
         rho_tilde[t] = DAMP*rho_tilde[t-1] + (1-DAMP)*rho_tilde[t]
         rho_bar[t] = DAMP*rho_bar[t-1] + (1-DAMP)* rho_bar[t]
-        # print("rho_tilde,\n", rho_tilde[t])
-        # print("rho_bar,\n", rho_bar[t])
-        if t == 99:
-            np.savetxt(f"rho_tilde_{t}.csv", rho_tilde[t], delimiter=',')
-            np.savetxt(f"rho_bar_{t}.csv", rho_bar[t], delimiter=',')
         if t < N_ITER-1:
             alpha_tilde[t+1], alpha_bar[t+1] = update_alpha(
                 x, rho_tilde[t], rho_bar[t])
             alpha_tilde[t+1] = DAMP*alpha_tilde[t] + (1-DAMP)*alpha_tilde[t+1]
             alpha_bar[t+1] = DAMP*alpha_bar[t] + (1-DAMP)*alpha_bar[t+1]
-
-            # print("alpha_t ilde,\n", alpha_tilde[t+1, 0])
-            # print("alpha_bar,\n", alpha_bar[t+1, 0])
-            if t == 98:
-                np.savetxt(f"alpha_tilde_{t+1}.csv", alpha_tilde[t+1], delimiter=',')
-                np.savetxt(f"alpha_bar_{t+1}.csv", alpha_bar[t+1], delimiter=',')
-
         allocation[t] = make_decision(x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
         print_allocation(x, t, allocation[t])
+
+        np.save("alpha_tilde.npy", alpha_tilde)
+        np.save("alpha_bar.npy", alpha_bar)
+        np.save("rho_tilde.npy", rho_tilde)
+        np.save("rho_bar.npy", rho_bar)
+
         # is_converged = check_convergence(
         #     alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
         # if is_converged:
@@ -56,8 +47,7 @@ def main():
         #     for i in range(dimension_i):
         #         print(f"{x[i]} - {allocation[t, i]}")
         # return
-    # show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
-    show_mp_traj_one(6, 1, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
+
 
 def get_neighbor_indices(x, idx):
     neighbor_idx = []
@@ -236,48 +226,6 @@ def print_allocation(x, t, current_allocation):
 
 def check_convergence():
     pass
-
-
-def show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar):
-    dim_x = len(x)
-    _, axes = plt.subplots(nrows=dim_x, ncols=4,
-                           tight_layout=True)
-    axes[0, 0].set_title(r"$\tilde{\alpha}$")
-    axes[0, 1].set_title(r"$\bar{\alpha}$")
-    axes[0, 2].set_title(r"$\tilde{\rho}$")
-    axes[0, 3].set_title(r"$\bar{\rho}$")
-    t = np.linspace(0, N_ITER-1, N_ITER)
-    for i in range(dim_x):
-        for j in range (N_RESOURCE):
-            axes[i, 0].plot(t, alpha_tilde[:, i, j], label=f"u{x[i]}--r{j}")
-            axes[i, 1].plot(t, alpha_bar[:, i, j], label=f"u{x[i]}--r{j}")
-            axes[i, 2].plot(t, rho_tilde[:, i, j], label=f"u{x[i]}--r{j}")
-            axes[i, 3].plot(t, rho_bar[:, i, j], label=f"u{x[i]}--r{j}")
-        axes[i, 0].set_xlim(xmin=0, xmax=N_ITER-1)
-        axes[i, 1].set_xlim(xmin=0, xmax=N_ITER-1)
-        axes[i, 2].set_xlim(xmin=0, xmax=N_ITER-1)
-        axes[i, 3].set_xlim(xmin=0, xmax=N_ITER-1)
-        axes[i, 0].legend()
-        axes[i, 1].legend()
-        axes[i, 2].legend()
-        axes[i, 3].legend()
-    plt.show()
-
-
-def show_mp_traj_one(x_number, resource_number, alpha_tilde, alpha_bar, rho_tilde, rho_bar):
-    _, axes = plt.subplots(nrows=1, ncols=2, tight_layout=True)
-    axes[0].set_title(r"$\alpha$")
-    axes[1].set_title(r"$\rho$")
-    t = np.linspace(0, N_ITER-1, N_ITER)
-    axes[0].plot(t, alpha_tilde[:, x_number, resource_number], label=r'$\tilde{\alpha}$')
-    axes[0].plot(t, alpha_bar[:, x_number, resource_number], label=r'$\bar{\alpha}$')
-    axes[1].plot(t, rho_tilde[:, x_number, resource_number], label=r'$\tilde{\rho}$')
-    axes[1].plot(t, rho_bar[:, x_number, resource_number], label=r'$\bar{\rho}$')
-    axes[0].set_xlim(xmin=0, xmax=N_ITER-1)
-    axes[1].set_xlim(xmin=0, xmax=N_ITER-1)
-    axes[0].legend()
-    axes[1].legend()
-    plt.show()
 
 
 if __name__=="__main__":
