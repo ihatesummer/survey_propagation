@@ -4,27 +4,28 @@ from itertools import permutations, combinations
 
 
 np.random.seed(0)
-N_USER = 3
+N_USER = 10
 AP_POSITIONS = np.array([[0, 0], [10, 0]])
 N_AP = np.size(AP_POSITIONS, axis=0)
-N_RESOURCE = 2
+N_RESOURCE = 7
 MAX_DISTANCE = 10
 ETA = 3
-TX_POWER = -15 # dBm
-NOISE_POWER = -80 # dBm
 STD_HAT = 3
 
 
 def main():
-    user_positions = generate_user_positions()
+    # user_positions = generate_user_positions()
+    user_positions = generate_user_positions_specify(3, 4, 3)
     ap2user_distances, _ = get_distances(user_positions)
     x = get_x()
+    print(x)
     y = get_y(x, ap2user_distances)
     for i in range(len(x)):
         print(f"user(s) {x[i]}: y_avg:{np.mean(y, axis=1)[i]}")
     np.save("user_positions.npy", user_positions)
     np.save("ap2user_distances.npy", ap2user_distances)
     np.save("y.npy", y)
+    np.savetxt("y.csv", y, delimiter=',')
     plot_positions(user_positions)
 
 
@@ -41,7 +42,44 @@ def generate_user_positions():
     pos_x = np.random.uniform(x_min, x_max, N_USER)
     pos_y = np.random.uniform(y_min, y_max, N_USER)
     user_positions = np.column_stack((pos_x, pos_y))
+    print(np.shape(user_positions))
 
+    return user_positions
+
+
+def is_in_range(user, ap):
+    distance = np.linalg.norm(user-ap, 2)
+    return distance <= MAX_DISTANCE
+
+
+# temporary manual generation function
+def generate_user_positions_specify(n_left, n_both, n_right):
+    x_min, x_max, y_min, y_max = get_map_boundaries()
+    n_users = n_left + n_both + n_right
+    user_positions = np.array([0, 0]) # placeholder
+
+    counter_left = 0
+    counter_both = 0
+    counter_right = 0
+    while(counter_left != n_left):
+        sample = [np.random.uniform(AP_POSITIONS[0, 0]-9, AP_POSITIONS[0, 0]),
+                  np.random.uniform(AP_POSITIONS[0, 1]-9, AP_POSITIONS[0, 1]+9)]
+        if is_in_range(sample, AP_POSITIONS[0]) and not is_in_range(sample, AP_POSITIONS[1]):
+            user_positions = np.row_stack((user_positions, sample))
+            counter_left += 1 
+    while(counter_right != n_right):
+        sample = [np.random.uniform(AP_POSITIONS[1, 0], AP_POSITIONS[1, 0]+9),
+                  np.random.uniform(AP_POSITIONS[1, 1]-9, AP_POSITIONS[1, 1]+9)]
+        if is_in_range(sample, AP_POSITIONS[1]) and not is_in_range(sample, AP_POSITIONS[0]):
+            user_positions = np.row_stack((user_positions, sample))
+            counter_right += 1 
+    while(counter_both != n_both):
+        sample = [np.random.uniform(AP_POSITIONS[0, 0], AP_POSITIONS[1, 0]),
+                  np.random.uniform(AP_POSITIONS[0, 1]-9, AP_POSITIONS[0, 1]+9)]
+        if is_in_range(sample, AP_POSITIONS[0]) and is_in_range(sample, AP_POSITIONS[1]):
+            user_positions = np.row_stack((user_positions, sample))
+            counter_both += 1 
+    user_positions = user_positions[1:, :] # get rid of placeholder
     return user_positions
 
 
@@ -61,12 +99,17 @@ def get_distances(user_positions):
 
 def get_x():
     x = []
-    user_list = np.linspace(0, N_USER-1, N_USER, dtype=int)
-    user_pair_list = np.array(list(combinations(user_list, r=2)))
+    user_list = np.linspace(6, 9, 4, dtype=int)
+    # user_list = np.linspace(0, N_USER-1, N_USER, dtype=int)
+    # user_pair_list = np.array(list(combinations(user_list, r=2)))
+
     for user in user_list:
         x.append(user.tolist())
-    for user_pair in user_pair_list:
-        x.append(user_pair.tolist())
+    for i in range(3):
+        for j in range(3):
+            x.append([i, 3+j])
+    # for user_pair in user_pair_list:
+    #     x.append(user_pair.tolist())
     return x
 
 

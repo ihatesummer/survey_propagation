@@ -1,22 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from itertools import cycle
 from system_setting import (N_USER, AP_POSITIONS,
                             N_AP, MAX_DISTANCE,
                             N_RESOURCE, get_x)
 
 N_CASE = 100
-N_ITER = 20
+N_ITER = 100
 EPS = 10**-6
 DAMP = 0.2 # 0 for no damp (full change), 1 for full damp (no change)
 np.random.seed(0)
 
 
 def main():
-    user_positions = np.load("user_positions.npy")
-    user2ap_distances = np.load("ap2user_distances.npy")
+    # user_positions = np.load("user_positions.npy")
+    # user2ap_distances = np.load("ap2user_distances.npy")
     x = get_x()
     y = np.load("y.npy")
+    y = y / np.max(y)
     dim_x = len(x)
     print("y,\n", y)
     allocation = np.zeros(shape=(N_ITER, dim_x))
@@ -31,9 +31,10 @@ def main():
         rho_tilde[t] = DAMP*rho_tilde[t-1] + (1-DAMP)*rho_tilde[t]
         rho_bar[t] = DAMP*rho_bar[t-1] + (1-DAMP)* rho_bar[t]
         # print("rho_tilde,\n", rho_tilde[t])
-        np.savetxt(f"rho_tilde_{t}.csv", rho_tilde[t], delimiter=',')
         # print("rho_bar,\n", rho_bar[t])
-        np.savetxt(f"rho_bar_{t}.csv", rho_bar[t], delimiter=',')
+        if t == 99:
+            np.savetxt(f"rho_tilde_{t}.csv", rho_tilde[t], delimiter=',')
+            np.savetxt(f"rho_bar_{t}.csv", rho_bar[t], delimiter=',')
         if t < N_ITER-1:
             alpha_tilde[t+1], alpha_bar[t+1] = update_alpha(
                 x, rho_tilde[t], rho_bar[t])
@@ -42,8 +43,9 @@ def main():
 
             # print("alpha_t ilde,\n", alpha_tilde[t+1, 0])
             # print("alpha_bar,\n", alpha_bar[t+1, 0])
-            np.savetxt(f"alpha_tilde_{t+1}.csv", alpha_tilde[t+1], delimiter=',')
-            np.savetxt(f"alpha_bar_{t+1}.csv", alpha_bar[t+1], delimiter=',')
+            if t == 98:
+                np.savetxt(f"alpha_tilde_{t+1}.csv", alpha_tilde[t+1], delimiter=',')
+                np.savetxt(f"alpha_bar_{t+1}.csv", alpha_bar[t+1], delimiter=',')
 
         allocation[t] = make_decision(x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
         print_allocation(x, t, allocation[t])
@@ -54,7 +56,8 @@ def main():
         #     for i in range(dimension_i):
         #         print(f"{x[i]} - {allocation[t, i]}")
         # return
-    show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
+    # show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
+    show_mp_traj_one(6, 1, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
 
 def get_neighbor_indices(x, idx):
     neighbor_idx = []
@@ -71,8 +74,10 @@ def get_neighbor_indices(x, idx):
         user2 = x[idx][1]
         neighbor_idx_1 = get_neighbor_indices(x, user1)
         neighbor_idx_2 = get_neighbor_indices(x, user2)
-        neighbor_idx_1.remove(idx)
-        neighbor_idx_2.remove(idx)
+        if idx in neighbor_idx_1:
+            neighbor_idx_1.remove(idx)
+        if idx in neighbor_idx_2:
+            neighbor_idx_2.remove(idx)
 
         neighbor_idx_both = [user1, user2] + neighbor_idx_1 + neighbor_idx_2
         neighbor_idx_both.sort()
@@ -136,7 +141,8 @@ def update_alpha(x, rho_tilde_now, rho_bar_now):
                     # print(f"term3: {-sum_term}")
                     # print(f"comparison list append {-rho_tilde_now[j0, r] + max(0, rho_bar_now[j0, r]) - sum_term}")
             if len(comparison_list) != 0:
-                alpha_tilde_next[i, r] = min(0, min(comparison_list))
+                # alpha_tilde_next[i, r] = min(0, min(comparison_list))
+                alpha_tilde_next[i, r] = min(comparison_list)
             else:
                 alpha_tilde_next[i, r] = 0
             # print(f"min(0, min({comparison_list}))={alpha_tilde_next[i, r]}")
@@ -193,7 +199,8 @@ def update_alpha(x, rho_tilde_now, rho_bar_now):
             sum_list_3 = 0
             for i_prime in i_neighbors:
                 sum_list_3 += min(0, rho_bar_now[i_prime, r])
-            alpha_bar_next[i, r] = max(A_ir_1, A_ir_2, -sum_list_3) + alpha_tilde_next[i, r]
+            # alpha_bar_next[i, r] = max(A_ir_1, A_ir_2, -sum_list_3) + alpha_tilde_next[i, r]
+            alpha_bar_next[i, r] = max(A_ir_1, A_ir_2) + alpha_tilde_next[i, r]
 
     return alpha_tilde_next, alpha_bar_next
 
@@ -223,7 +230,8 @@ def make_decision(x, alpha_tilde_now, alpha_bar_now,
 def print_allocation(x, t, current_allocation):
     print("."*10 + f"t={t}" + "."*10)
     for i in range(len(x)):
-        print(f"user(s) {x[i]}: resource {current_allocation[i]}")
+        if not (np.isnan(current_allocation[i])):
+            print(f"user(s) {x[i]}: resource {current_allocation[i]}")
 
 
 def check_convergence():
@@ -253,6 +261,22 @@ def show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar):
         axes[i, 1].legend()
         axes[i, 2].legend()
         axes[i, 3].legend()
+    plt.show()
+
+
+def show_mp_traj_one(x_number, resource_number, alpha_tilde, alpha_bar, rho_tilde, rho_bar):
+    _, axes = plt.subplots(nrows=1, ncols=2, tight_layout=True)
+    axes[0].set_title(r"$\alpha$")
+    axes[1].set_title(r"$\rho$")
+    t = np.linspace(0, N_ITER-1, N_ITER)
+    axes[0].plot(t, alpha_tilde[:, x_number, resource_number], label=r'$\tilde{\alpha}$')
+    axes[0].plot(t, alpha_bar[:, x_number, resource_number], label=r'$\bar{\alpha}$')
+    axes[1].plot(t, rho_tilde[:, x_number, resource_number], label=r'$\tilde{\rho}$')
+    axes[1].plot(t, rho_bar[:, x_number, resource_number], label=r'$\bar{\rho}$')
+    axes[0].set_xlim(xmin=0, xmax=N_ITER-1)
+    axes[1].set_xlim(xmin=0, xmax=N_ITER-1)
+    axes[0].legend()
+    axes[1].legend()
     plt.show()
 
 
