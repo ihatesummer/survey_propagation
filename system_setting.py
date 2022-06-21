@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from itertools import permutations
+from itertools import permutations, combinations
 
 
 np.random.seed(1)
@@ -100,7 +100,7 @@ def get_x():
     x = []
     user_list = np.linspace(4, 5, 2, dtype=int)
     # user_list = np.linspace(0, N_USER-1, N_USER, dtype=int)
-    # user_pair_list = np.array(list(combinations(user_list, r=2)))
+    user_pair_list = np.array(list(combinations(user_list, r=2)))
 
     for user in user_list:
         x.append(user.tolist())

@@ -1,11 +1,10 @@
 import numpy as np
-from system_setting import (N_USER, MAX_DISTANCE,
-                            N_RESOURCE, get_x)
+from system_setting import (N_USER, N_RESOURCE, get_x)
 
 N_CASE = 100
 N_ITER = 100
 EPS = 10**-6
-DAMP = 0.2 # 0 for no damp (full change), 1 for full damp (no change)
+DAMP = 0 # 0 for no damp (full change), 1 for full damp (no change)
 np.random.seed(0)
 
 
@@ -33,17 +32,17 @@ def main():
         allocation[t] = make_decision(x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
         print_allocation(x, t, allocation[t])
 
-        np.save("alpha_tilde.npy", alpha_tilde)
-        np.save("alpha_bar.npy", alpha_bar)
-        np.save("rho_tilde.npy", rho_tilde)
-        np.save("rho_bar.npy", rho_bar)
-        np.save("allocation.npy", allocation)
 
         is_converged = check_convergence(
             t, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
         if is_converged:
             print(f"converged at t={t}")
             break
+    np.save("alpha_tilde.npy", alpha_tilde[1:t+1, :, :])
+    np.save("alpha_bar.npy", alpha_bar[1:t+1, :, :])
+    np.save("rho_tilde.npy", rho_tilde[1:t+1, :, :])
+    np.save("rho_bar.npy", rho_bar[1:t+1, :, :])
+    np.save("allocation.npy", allocation)
 
 
 def get_neighbor_indices(x, idx):
