@@ -1,7 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from system_setting import (N_USER, AP_POSITIONS,
-                            N_AP, MAX_DISTANCE,
+from system_setting import (N_USER, MAX_DISTANCE,
                             N_RESOURCE, get_x)
 
 N_CASE = 100
@@ -39,14 +37,13 @@ def main():
         np.save("alpha_bar.npy", alpha_bar)
         np.save("rho_tilde.npy", rho_tilde)
         np.save("rho_bar.npy", rho_bar)
+        np.save("allocation.npy", allocation)
 
-        # is_converged = check_convergence(
-        #     alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
-        # if is_converged:
-        #     print(f"converged at t={t}")
-        #     for i in range(dimension_i):
-        #         print(f"{x[i]} - {allocation[t, i]}")
-        # return
+        is_converged = check_convergence(
+            t, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
+        if is_converged:
+            print(f"converged at t={t}")
+            break
 
 
 def get_neighbor_indices(x, idx):
@@ -72,11 +69,6 @@ def get_neighbor_indices(x, idx):
         neighbor_idx_both = [user1, user2] + neighbor_idx_1 + neighbor_idx_2
         neighbor_idx_both.sort()
         return neighbor_idx_both
-
-
-def check_range(ap_position, user_position):
-    distance = np.linalg.norm(ap_position - user_position, 2)
-    return MAX_DISTANCE >= distance
 
 
 def update_rho(y, alpha_tilde_now, alpha_bar_now):
@@ -105,37 +97,23 @@ def update_alpha(x, rho_tilde_now, rho_bar_now):
     for i in range(dim_x):
         i_neighbors = get_neighbor_indices(x, i)
         i_and_i_neighbors = np.array([i] + i_neighbors)
-        # print(f"\nx[i] = {x[i]}")
-        # print(f"neighbors:")
-        # for n in i_neighbors: 
-        #     print(f"{x[n]}")
         for r in range(N_RESOURCE):
-            # print(f"r={r}")
-            # alpha_tilde
             comparison_list = [] # for second min operator w.r.t j0
             for j0 in range(dim_x):
                 if j0 not in i_and_i_neighbors:
-                    # print(f"j0={j0}, x[j0] = {x[j0]}")
                     sum_term = 0 # for sum w.r.t j0_prime
                     j0_neighbors_except_i_neighbors = list(
                         set(get_neighbor_indices(x, j0)) - set(i_neighbors))
                     j0_neighbors_except_i_neighbors.sort()
                     for j0_prime in j0_neighbors_except_i_neighbors:
-                        # print(f"j0'={j0_prime}, x[j0']={x[j0_prime]}")
                         sum_term += min(0, rho_bar_now[j0_prime, r])
-                        # print(f"added min(0, {rho_bar_now[j0_prime, r]}) to sum term")
                     comparison_list.append(
                         -rho_tilde_now[j0, r] + max(0, rho_bar_now[j0, r]) - sum_term)
-                    # print(f"term1: -rho_tilde[{j0}, {r}]={-rho_tilde_now[j0, r]}")
-                    # print(f"term2: max(0, rho_bar[{j0}, {r}]={rho_bar_now[j0, r]})={max(0, rho_bar_now[j0, r])}")
-                    # print(f"term3: {-sum_term}")
-                    # print(f"comparison list append {-rho_tilde_now[j0, r] + max(0, rho_bar_now[j0, r]) - sum_term}")
             if len(comparison_list) != 0:
                 # alpha_tilde_next[i, r] = min(0, min(comparison_list))
                 alpha_tilde_next[i, r] = min(comparison_list)
             else:
                 alpha_tilde_next[i, r] = 0
-            # print(f"min(0, min({comparison_list}))={alpha_tilde_next[i, r]}")
 
             # alpha_bar
             comparison_list_1 = [] # for A_ir(1)
@@ -204,14 +182,8 @@ def make_decision(x, alpha_tilde_now, alpha_bar_now,
     for i in range(dim_x):
         b_tilde[i] = np.max(rho_tilde_now[i] + alpha_tilde_now[i])
         b_bar[i] = np.max(rho_bar_now[i] + alpha_bar_now[i])
-        # print(i, x[i])
-        # print(rho_tilde_now[i] + alpha_tilde_now[i], " -> ", b_tilde[i])
-        # print(rho_bar_now[i] + alpha_bar_now[i], " -> ", b_bar[i])
         if b_tilde[i] > b_bar[i]:
-            # print("b_tilde>b_bar")
-            # print(f"rho_tilde+alpha_tilde={rho_tilde_now[i] + alpha_tilde_now[i]}")
             allocation[i] = np.argmax(rho_tilde_now[i] + alpha_tilde_now[i])
-            # print(f"allocation: {allocation[i]}")
         else:
             allocation[i] = None
     return allocation
@@ -224,8 +196,18 @@ def print_allocation(x, t, current_allocation):
             print(f"user(s) {x[i]}: resource {current_allocation[i]}")
 
 
-def check_convergence():
-    pass
+def check_convergence(t, alpha_tilde, alpha_bar, rho_tilde, rho_bar):
+    alpha_tilde_converged = (np.abs(alpha_tilde[t] - alpha_tilde[t-1]) < EPS).all()
+    alpha_bar_converged = (np.abs(alpha_bar[t] - alpha_bar[t-1]) < EPS).all()
+    rho_tilde_converged = (np.abs(rho_tilde[t] - rho_tilde[t-1]) < EPS).all()
+    rho_bar_converged = (np.abs(rho_bar[t] - rho_bar[t-1]) < EPS).all()
+
+    alpha_converged = alpha_tilde_converged and alpha_bar_converged
+    rho_converged = rho_tilde_converged and rho_bar_converged
+
+    return alpha_converged and rho_converged
+
+
 
 
 if __name__=="__main__":

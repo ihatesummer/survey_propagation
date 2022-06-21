@@ -1,21 +1,20 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from itertools import permutations, combinations
+from itertools import permutations
 
 
-np.random.seed(0)
-N_USER = 10
+np.random.seed(1)
+N_USER = 6
 AP_POSITIONS = np.array([[0, 0], [10, 0]])
 N_AP = np.size(AP_POSITIONS, axis=0)
-N_RESOURCE = 7
+N_RESOURCE = 4
 MAX_DISTANCE = 10
-ETA = 3
 STD_HAT = 3
 
 
 def main():
     # user_positions = generate_user_positions()
-    user_positions = generate_user_positions_specify(3, 4, 3)
+    user_positions = generate_user_positions_specify(2, 2, 2)
     ap2user_distances, _ = get_distances(user_positions)
     x = get_x()
     print(x)
@@ -48,7 +47,7 @@ def generate_user_positions():
 
 
 def is_in_range(user, ap):
-    distance = np.linalg.norm(user-ap, 2)
+    distance = np.linalg.norm(user - ap, 2)
     return distance <= MAX_DISTANCE
 
 
@@ -99,15 +98,15 @@ def get_distances(user_positions):
 
 def get_x():
     x = []
-    user_list = np.linspace(6, 9, 4, dtype=int)
+    user_list = np.linspace(4, 5, 2, dtype=int)
     # user_list = np.linspace(0, N_USER-1, N_USER, dtype=int)
     # user_pair_list = np.array(list(combinations(user_list, r=2)))
 
     for user in user_list:
         x.append(user.tolist())
-    for i in range(3):
-        for j in range(3):
-            x.append([i, 3+j])
+    for i in range(2):
+        for j in range(2):
+            x.append([i, 2+j])
     # for user_pair in user_pair_list:
     #     x.append(user_pair.tolist())
     return x

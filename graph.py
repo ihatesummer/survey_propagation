@@ -1,15 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from survey_propagation import N_ITER, N_RESOURCE
+from system_setting import get_x
 
 
 def main():
+    x = get_x()
     alpha_tilde = np.load("alpha_tilde.npy")
     alpha_bar = np.load("alpha_bar.npy")
     rho_tilde = np.load("rho_tilde.npy")
     rho_bar = np.load("rho_bar.npy")
-    # show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
-    show_mp_traj_one(6, 1, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
+    print(x[-3:])
+    show_mp_traj(x[-3:], alpha_tilde, alpha_bar, rho_tilde, rho_bar)
+    # show_mp_traj_one(1, 6, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
 
 
 def show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar):
@@ -31,10 +34,10 @@ def show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar):
         axes[i, 1].set_xlim(xmin=0, xmax=N_ITER-1)
         axes[i, 2].set_xlim(xmin=0, xmax=N_ITER-1)
         axes[i, 3].set_xlim(xmin=0, xmax=N_ITER-1)
-        axes[i, 0].legend()
-        axes[i, 1].legend()
-        axes[i, 2].legend()
-        axes[i, 3].legend()
+        # axes[i, 0].legend()
+        # axes[i, 1].legend()
+        # axes[i, 2].legend()
+        # axes[i, 3].legend()
     plt.show()
 
 

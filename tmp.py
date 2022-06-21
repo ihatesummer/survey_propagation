@@ -1,13 +1,10 @@
 import enum
 import numpy as np
 
-a = np.array([1, 1])
-b = np.array([2, 2])
+a = np.array([0, 1, 2, 3])
+b = a < 2
+print(b.all())
 
-list= np.array([0, 0])
-list= np.row_stack((list, a))
-list= np.row_stack((list, b))
-print(list[1:,:])
 
 
 
