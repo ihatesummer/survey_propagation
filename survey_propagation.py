@@ -1,3 +1,4 @@
+import enum
 import numpy as np
 import json
 import time
@@ -71,12 +72,23 @@ def update_rho(y, alpha_tilde_now, alpha_bar_now):
 
     for r in range(n_resource):
         alpha_tilde_except_r = np.delete(alpha_tilde_now, r, axis=1)
-        alpha_bar_row_except_r = np.delete(alpha_bar_now, r, axis=1)
+        alpha_bar_except_r = np.delete(alpha_bar_now, r, axis=1)
+        y_except_r = np.delete(y, r, axis=1)
+        rho_tilde_now[:, r] = y[:, r] + np.sum(
+            alpha_tilde_except_r - alpha_bar_except_r, axis=1)
+        rho_bar_now[:, r] = y[:, r] - np.max(
+            y_except_r + alpha_bar_except_r, axis=1)
+    return rho_tilde_now, rho_bar_now
+
+    # old
+    for r in range(n_resource):
+        alpha_tilde_except_r = np.delete(alpha_tilde_now, r, axis=1)
+        alpha_bar_except_r = np.delete(alpha_bar_now, r, axis=1)
         y_except_r = np.delete(y, r, axis=1)
         rho_tilde_now[:, r] = y[:, r] - np.max(
             y_except_r + alpha_tilde_except_r, axis=1)
         rho_bar_now[:, r] = rho_tilde_now[:, r] + np.sum(
-            alpha_bar_row_except_r, axis=1) - y[:, r]
+            alpha_bar_except_r, axis=1) - y[:, r]
     return rho_tilde_now, rho_bar_now
 
 
@@ -84,6 +96,33 @@ def update_alpha(neighbor_mapping, x_j0, rho_tilde_now, rho_bar_now):
     dim_x, n_resource = np.shape(rho_tilde_now)
     alpha_tilde_next = np.zeros(shape=(dim_x, n_resource))
     alpha_bar_next = np.zeros(shape=(dim_x, n_resource))
+
+    for i in range(dim_x):
+        # tilde
+        term1 = np.sum(
+            np.minimum(rho_bar_now[neighbor_mapping[i]] - rho_tilde_now[neighbor_mapping[i], :], 0), axis=0)
+        term2 = -np.delete(rho_bar_now, i, axis=0)
+        term3 = np.maximum(np.delete(rho_bar_now - rho_tilde_now, i, axis=0), 0)
+        j_list = np.delete(np.linspace(0, dim_x-1, dim_x, dtype=int), i)
+        term4 = np.zeros(shape=np.shape(term3))
+        for row, j in enumerate(j_list):
+            j_prime = list(set(neighbor_mapping[j]) - set([i]))
+            term4[row, :] = -np.sum(np.minimum(rho_bar_now[j_prime, :] - rho_tilde_now[j_prime, :], 0), axis=0)
+        alpha_tilde_next[i, :] = term1 + np.minimum(
+            np.min(term2 + term3 + term4, axis=0), 0)
+        
+        # bar
+        term1 = -rho_bar_now[x_j0[i], :]
+        term2 = np.maximum(rho_bar_now[x_j0[i], :] - rho_tilde_now[x_j0[i], :], 0)
+        term3 = np.zeros(shape=np.shape(term2))
+        for row, j0 in enumerate(x_j0[i]):
+            j0_prime = list(set(neighbor_mapping[j0]) - set(neighbor_mapping[i]))
+            term3[row, :] = -np.sum(np.minimum(rho_bar_now[j0_prime, :] - rho_tilde_now[j0_prime, :], 0), axis=0)
+        alpha_bar_next[i, :] = np.minimum(
+            np.min(term1 + term2 + term3, axis=0), 0)
+    return alpha_tilde_next, alpha_bar_next
+
+    # old
     for i in range(dim_x):
         j0_compare_alpha_tilde = np.zeros(n_resource) # placeholder
         j0_compare_A_i_2 = np.zeros(n_resource) # placeholder
@@ -140,6 +179,19 @@ def make_decision(x, alpha_tilde_now, alpha_bar_now,
                   rho_tilde_now, rho_bar_now):
     dim_x = len(x)
     allocation = np.zeros(dim_x)
+
+    b_tilde = alpha_tilde_now + rho_tilde_now
+    b_bar = alpha_bar_now + rho_bar_now
+    for i in range(dim_x):
+        # print(i, np.max(b_tilde[i, :]))
+        if np.max(b_tilde[i, :]) > 0:
+            allocation[i] = np.argmax(b_bar[i, :])
+            # print(b_bar[i, :])
+        else:
+            allocation[i] = None
+    return allocation
+
+    # old
     b_tilde = np.zeros(dim_x)
     b_bar = np.zeros(dim_x)
     for i in range(dim_x):
@@ -196,6 +248,6 @@ def get_sum_rate(y, converged_allocation):
 
 if __name__=="__main__":
     convergence_time, n_iter, sum_rate = main(
-        n_user=30, n_resource=20, max_iter=1000, damping=0.3,
+        n_user=40, n_resource=20, max_iter=1000, damping=0.3,
         converge_thresh=10**-2, seed=0, save_path="debug")
-    print(f"converged in {convergence_time}s/{n_iter}itr, sum rate {sum_rate}")
+    print(f"converged in {convergence_time}s/{n_iter}itr")
