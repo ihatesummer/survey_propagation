@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from survey_propagation import N_RESOURCE
+from survey_propagation import n_resource
 from system_setting import get_x
 
 
@@ -26,7 +26,7 @@ def show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar):
     axes[0, 3].set_title(r"$\bar{\rho}$")
     t = np.linspace(0, n_iter-1, n_iter)
     for i in range(dim_x):
-        for j in range (N_RESOURCE):
+        for j in range (n_resource):
             axes[i, 0].plot(t, alpha_tilde[:, i, j], label=f"u{x[i]}--r{j}")
             axes[i, 1].plot(t, alpha_bar[:, i, j], label=f"u{x[i]}--r{j}")
             axes[i, 2].plot(t, rho_tilde[:, i, j], label=f"u{x[i]}--r{j}")
@@ -40,6 +40,7 @@ def show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar):
         # axes[i, 2].legend()
         # axes[i, 3].legend()
     plt.show()
+    plt.savefig("mp_trajectory.png")
 
 
 def show_mp_traj_one(x_number, resource_number, alpha_tilde, alpha_bar, rho_tilde, rho_bar):
