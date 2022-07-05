@@ -196,6 +196,6 @@ def get_sum_rate(y, converged_allocation):
 
 if __name__=="__main__":
     convergence_time, n_iter, sum_rate = main(
-        n_user=40, n_resource=20, max_iter=1000, damping=0.3,
+        n_user=30, n_resource=20, max_iter=1000, damping=0.3,
         converge_thresh=10**-2, seed=0, save_path="debug")
     print(f"converged in {convergence_time}s/{n_iter}itr, sum rate {sum_rate}")

@@ -8,7 +8,7 @@ N_REPEAT = 100
 
 def main():
     n_resource = 50
-    n_user_list = [15, 20, 30, 40, 50, 60, 70]
+    n_user_list = [10, 20, 30, 40, 50]
     sum_rates = np.zeros(shape=(len(n_user_list), N_REPEAT))
     for i, n_user in enumerate(n_user_list):
         print("."*20 + f"n_user: {n_user}" + "."*20)
@@ -21,9 +21,10 @@ def main():
                     std_hat=3,
                     seed=n_repeat,
                     save_path=save_path)
-            convergence_time, n_iter, sum_rates[i, n_repeat] = sp.main(
+            (convergence_time, n_iter,
+             sum_rates[i, n_repeat]) = sp.main(
                 n_user=n_user, n_resource=n_resource,
-                max_iter=n_user*3, damping=0.5,
+                max_iter=n_user*3, damping=0.3,
                 converge_thresh=10**-2, seed=n_repeat,
                 save_path=save_path)
             print(f"r{n_repeat} converged in {convergence_time:.2f}s({n_iter}itr), sum rate {sum_rates[i, n_repeat]:.2f}")

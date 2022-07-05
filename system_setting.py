@@ -257,7 +257,7 @@ def plot_positions(user_positions, ap_positions,
 
 
 if __name__=="__main__":
-    main(n_user=40, n_resource=20,
+    main(n_user=30, n_resource=20,
          ap_positions=np.array([[0, 0], [10, 0]]),
          max_distance=10, std_hat=3, seed=0,
          save_path="debug")
