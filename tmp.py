@@ -1,8 +1,7 @@
-import enum
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy.optimize import linear_sum_assignment
 
-n = np.array([1, 1, 2, 3, 4, 6, 6, 7, 8]).reshape((3,3))
 
-
-print(n)
-print(np.zeros(shape=np.shape(n)))
+b = np.linspace(0,9,10)
+print(np.random.choice(b, size=20))

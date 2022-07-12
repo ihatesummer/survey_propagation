@@ -1,39 +1,35 @@
-import enum
 import numpy as np
 import json
 import time
 import os
 
+np.set_printoptions(precision=2)
 
-def main(n_user, n_resource, max_iter, damping, converge_thresh, seed, save_path):
+
+def main(n_user, n_pilot, max_iter, damping, converge_thresh, seed, save_path):
     np.random.seed(seed)
-    x, neighbor_mapping, x_j0, y, y_normalizer = read_files(save_path, seed)
-    
+    x, neighbor_mapping, x_j0, y, y_normalizer, occupancy = read_files(save_path, seed)
     # for idx, user_list in enumerate(x):
     #     print(f"index {idx}: user(s) {user_list}")
     dim_x = len(x)
-    alpha_tilde = np.zeros(shape=(max_iter, dim_x, n_resource))
-    alpha_bar = np.zeros(shape=(max_iter, dim_x, n_resource))
-    rho_tilde = np.zeros(shape=(max_iter, dim_x, n_resource))
-    rho_bar = np.zeros(shape=(max_iter, dim_x, n_resource))
+    alpha_tilde = np.zeros(shape=(max_iter, dim_x, n_pilot))
+    alpha_bar = np.zeros(shape=(max_iter, dim_x, n_pilot))
+    rho_tilde = np.zeros(shape=(max_iter, dim_x, n_pilot))
+    rho_bar = np.zeros(shape=(max_iter, dim_x, n_pilot))
     allocation = np.zeros(shape=(max_iter, dim_x))
-
     tic = time.time()
     for t in range(1, max_iter):
-        rho_tilde[t], rho_bar[t] = update_rho(
-            y, alpha_tilde[t], alpha_bar[t])
+        rho_tilde[t], rho_bar[t] = update_rho(y, alpha_tilde[t], alpha_bar[t])
         rho_tilde[t] = damping*rho_tilde[t-1] + (1-damping)*rho_tilde[t]
         rho_bar[t] = damping*rho_bar[t-1] + (1-damping)* rho_bar[t]
         if t < max_iter-1:
-            alpha_tilde[t+1], alpha_bar[t+1] = update_alpha(
-                neighbor_mapping, x_j0, rho_tilde[t], rho_bar[t])
+            alpha_tilde[t+1], alpha_bar[t+1] = update_alpha(neighbor_mapping, x_j0, rho_tilde[t], rho_bar[t])
             alpha_tilde[t+1] = damping*alpha_tilde[t] + (1-damping)*alpha_tilde[t+1]
             alpha_bar[t+1] = damping*alpha_bar[t] + (1-damping)*alpha_bar[t+1]
         if save_path=="debug":
-            allocation[t] = make_decision(
-                x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
-            print_allocation(x, t, allocation[t], n_user, n_resource)
-            sum_rate = get_sum_rate(y, allocation[t])
+            allocation[t] = make_decision(x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
+            print_allocation(x, t, allocation[t], n_user, n_pilot, occupancy)
+            sum_rate = get_sum_rate(y, allocation[t]) * y_normalizer
             print(f"Sumrate: {sum_rate}")
         is_converged = check_convergence(
             t, alpha_tilde, alpha_bar, rho_tilde, rho_bar, converge_thresh)
@@ -41,28 +37,28 @@ def main(n_user, n_resource, max_iter, damping, converge_thresh, seed, save_path
             convergence_time = time.time() - tic
             allocation[t] = make_decision(
                 x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
-            sum_rate = get_sum_rate(y, allocation[t])
+            sum_rate = get_sum_rate(y, allocation[t]) * y_normalizer
             if save_path=="debug":
-                np.save("msg_alpha_tilde.npy", alpha_tilde[1:t+1, :, :])
-                np.save("msg_alpha_bar.npy", alpha_bar[1:t+1, :, :])
-                np.save("msg_rho_tilde.npy", rho_tilde[1:t+1, :, :])
-                np.save("msg_rho_bar.npy", rho_bar[1:t+1, :, :])
-                np.save("allocation.npy", allocation[t, :])
+                np.save(os.path.join(save_path, "msg_alpha_tilde.npy"), alpha_tilde[1:t+1, :, :])
+                np.save(os.path.join(save_path, "msg_alpha_bar.npy"), alpha_bar[1:t+1, :, :])
+                np.save(os.path.join(save_path, "msg_rho_tilde.npy"), rho_tilde[1:t+1, :, :])
+                np.save(os.path.join(save_path, "msg_rho_bar.npy"), rho_bar[1:t+1, :, :])
+                # np.save("allocation.npy", allocation[t, :])
             return convergence_time, t, sum_rate
     return time.time() - tic, max_iter, None
 
 
 def read_files(save_path, seed):
-    with open(os.path.join(save_path, f"x_{seed}.json"), 'r') as f:
-        x = json.load(f)
     with open(os.path.join(save_path, f"x_neighbors_{seed}.json"), 'r') as f:
         neighbor_mapping = json.load(f)
     with open(os.path.join(save_path, f"x_j0_{seed}.json"), 'r') as f:
         x_j0 = json.load(f)
+    occupancy = np.load(os.path.join(save_path, f"occupancy_{seed}.npy"))
+    x = np.load(os.path.join(save_path, f"x_{seed}.npy"))
     y = np.load(os.path.join(save_path, f"y_{seed}.npy"))
     y_normalizer = np.max(y)
     y = y / y_normalizer
-    return x, neighbor_mapping, x_j0, y, y_normalizer
+    return x, neighbor_mapping, x_j0, y, y_normalizer, occupancy
 
 
 def update_rho(y, alpha_tilde_now, alpha_bar_now):
@@ -204,14 +200,15 @@ def make_decision(x, alpha_tilde_now, alpha_bar_now,
     return allocation
 
 
-def print_allocation(x, t, current_allocation, n_user, n_resource):
+def print_allocation(x, t, current_allocation, n_user, n_pilot, occupancy):
     print("."*10 + f"t={t}" + "."*10)
     used_resource_count = 0
     used_resource_list = np.array([], dtype=int)
     assigned_user_list = np.array([], dtype=int)
     for i in range(len(x)):
         if not (np.isnan(current_allocation[i])):
-            print(f"idx {i}, user(s) {x[i]}: resource {int(current_allocation[i])}")
+            pilot_no = int(current_allocation[i])
+            print(f"idx {i}, user(s) {x[i]}, {occupancy[pilot_no]}: pilot {pilot_no}")
             used_resource_list = np.append(used_resource_list,
                                            int(current_allocation[i]))
             assigned_user_list = np.append(assigned_user_list, x[i])
@@ -222,8 +219,8 @@ def print_allocation(x, t, current_allocation, n_user, n_resource):
     n_duplicate_user = np.size(assigned_user_list) - assigned_user_count_unique
     print(f"#duplicate rsc: {n_duplicate_resource} || " + 
           f"#duplicate usr: {n_duplicate_user}\n" + 
-          f"#unused rsc: {n_resource-used_resource_count} || "
-          f"#unassigned usr: {n_user-assigned_user_count_unique}")
+          f"#unused rsc: {n_pilot-used_resource_count} || "
+          f"#unassigned usr: {n_user-n_pilot-assigned_user_count_unique}")
 
 
 def check_convergence(t, alpha_tilde, alpha_bar, rho_tilde, rho_bar, converge_thresh):
@@ -248,6 +245,6 @@ def get_sum_rate(y, converged_allocation):
 
 if __name__=="__main__":
     convergence_time, n_iter, sum_rate = main(
-        n_user=40, n_resource=20, max_iter=1000, damping=0.3,
+        n_user=10, n_pilot=5, max_iter=100, damping=0.3,
         converge_thresh=10**-2, seed=0, save_path="debug")
     print(f"converged in {convergence_time}s/{n_iter}itr")

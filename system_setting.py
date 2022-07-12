@@ -1,169 +1,168 @@
+from xml.dom.minidom import ReadOnlySequentialNamedNodeMap
 import numpy as np
 import matplotlib.pyplot as plt
 import json
 import os
-from itertools import permutations
+from itertools import permutations, combinations
 
-AP_HEIGHT = 5
 
-def main(n_user, n_resource, ap_positions,
-         max_distance, std_hat, seed, save_path):
+AREA_SIZE = (1000, 1000)  # meter
+AP_HEIGHT = 15  # meter
+USER_HEIGHT = 1.65  # meter
+STD_SH = 8  # dB
+CARRIER_FREQ = 1.9*(10**9) # Hz
+L = 46.3 + 33.9*np.log10(CARRIER_FREQ) \
+        - 13.82*np.log10(AP_HEIGHT) \
+        - (1.1*np.log10(CARRIER_FREQ)-0.7)*USER_HEIGHT \
+        + 1.56*np.log10(CARRIER_FREQ) - 0.8
+D0, D1 = 10, 50  # mters
+RHO = 0.1 / (7.2*10**-13)
+
+np.set_printoptions(precision=2)
+
+
+def main(n_user, n_pilot, n_ap, seed, save_path):
     np.random.seed(seed)
-    user_positions = generate_user_positions(
-        n_user, ap_positions, max_distance)
-    user_coverages = get_coverages(
-        user_positions, ap_positions, max_distance)
-    ap2user_distances, _ = get_distances(
-        user_positions, ap_positions)
-    x = get_x(user_coverages)
+    user_positions = generate_positions(n_user)
+    ap_positions = generate_positions(n_ap)
+    user2ap_distances = get_distances(
+        user_positions, ap_positions, is_wrapped=True)
+    path_loss = get_path_loss(user2ap_distances)
+    beta = get_largeScale_coeff(path_loss)
+    worst_users = get_worst_users(beta, n_pilot)
+    occupancy = preallocate(worst_users, n_pilot)
+    x = get_x(n_user, worst_users)
     x_neighbors, x_j0 = get_subsets(x)
-    y = get_y(x, ap2user_distances, n_resource, std_hat)
-    if save_path=="debug":
+    y = get_y(x, occupancy, n_pilot, beta)
+    if save_path == "debug":
         plot_positions(user_positions, ap_positions,
-                    max_distance, save_path, seed)
-    with open(os.path.join(save_path, f"x_{seed}.json"), 'w') as f:
-        json.dump(x, f, indent=2) 
+                       save_path, seed)
     with open(os.path.join(save_path, f"x_neighbors_{seed}.json"), 'w') as f:
         json.dump(x_neighbors, f, indent=2)
     with open(os.path.join(save_path, f"x_j0_{seed}.json"), 'w') as f:
         json.dump(x_j0, f, indent=2)
-    np.save(os.path.join(save_path, f"user_positions_{seed}.npy"), user_positions)
-    np.save(os.path.join(save_path, f"ap2user_distances_{seed}.npy"), ap2user_distances)
+    np.save(os.path.join(
+        save_path, f"user_positions_{seed}.npy"), user_positions)
+    np.save(os.path.join(
+        save_path, f"ap_positions_{seed}.npy"), ap_positions)
+    np.save(os.path.join(save_path, f"occupancy_{seed}.npy"), occupancy)
+    np.save(os.path.join(save_path, f"beta_{seed}.npy"), beta)
+    np.save(os.path.join(save_path, f"x_{seed}.npy"), x)
     np.save(os.path.join(save_path, f"y_{seed}.npy"), y)
     np.savetxt(os.path.join(save_path, f"y_{seed}.csv"), y, delimiter=',')
 
 
-def get_map_boundaries(ap_positions, max_distance):
-    x_min = np.min(ap_positions[:, 0]) - max_distance
-    x_max = np.max(ap_positions[:, 0]) + max_distance
-    y_min = np.min(ap_positions[:, 1]) - max_distance
-    y_max = np.max(ap_positions[:, 1]) + max_distance
-    return x_min, x_max, y_min, y_max
+def generate_positions(n_user):
+    x_min, y_min = (0, 0)
+    x_max, y_max = AREA_SIZE
+    pos_x = np.random.uniform(x_min, x_max, size=n_user)
+    pos_y = np.random.uniform(y_min, y_max, size=n_user)
+
+    return np.column_stack((pos_x, pos_y))
 
 
-def is_in_range(user, ap, max_distance):
-    distance = np.linalg.norm(user - ap, 2)
-    return distance <= max_distance
-
-
-def generate_user_positions(n_user, ap_positions, max_distance):
-    n_ap = np.size(ap_positions, axis=0)
-    x_min, x_max, y_min, y_max = get_map_boundaries(
-        ap_positions, max_distance)
-    user_positions = np.zeros(shape=(n_user, 2))
-
-    n_sample = 0
-    n_sample_left = 0
-    n_sample_right = 0
-    n_sample_both = 0
-    while n_sample != n_user:
-        pos_x = np.random.uniform(x_min, x_max)
-        pos_y = np.random.uniform(y_min, y_max)
-        sample = np.array([pos_x, pos_y])
-
-        left = is_in_range(sample, ap_positions[0], max_distance) and not is_in_range(sample, ap_positions[1], max_distance)
-        right = is_in_range(sample, ap_positions[1], max_distance) and not is_in_range(sample, ap_positions[0], max_distance)
-        both = is_in_range(sample, ap_positions[0], max_distance) and is_in_range(sample, ap_positions[1], max_distance)
-
-        if left:
-            if n_sample_left < int(n_user/3):
-                user_positions[n_sample] = sample
-                n_sample_left += 1
-        elif right:
-            if n_sample_right < int(n_user/3):
-                user_positions[n_sample] = sample
-                n_sample_right += 1
-        elif both:
-            if n_sample_both < n_user - int(n_user/3)*2:
-                user_positions[n_sample] = sample
-                n_sample_both += 1
-        n_sample = n_sample_left + n_sample_right + n_sample_both
-        
-        # is_covered = False
-        # for ap in range(n_ap):
-        #     is_covered = is_covered or is_in_range(
-        #         sample, ap_positions[ap], max_distance)
-        # if is_covered:
-        #     user_positions[n_sample] = sample
-        #     n_sample += 1
-
-    return user_positions
-
-
-def get_coverages(user_positions, ap_positions, max_distance):
-    n_ap = np.size(ap_positions, axis=0)
+def get_distances(user_positions, ap_positions, is_wrapped):
     n_user = np.size(user_positions, axis=0)
-    user_coverages = np.zeros(shape=(n_user, n_ap), dtype=bool)
-    for i, user in enumerate(user_positions):
-        for a, ap in enumerate(ap_positions):
-            user_coverages[i, a] = is_in_range(user, ap, max_distance)
-    return user_coverages
+    n_ap = np.size(ap_positions, axis=0)
+    user_pos_3d = np.column_stack(
+        (user_positions, np.ones(n_user)*USER_HEIGHT))
+    ap_pos_3d = np.column_stack(
+        (ap_positions, np.ones(n_ap)*AP_HEIGHT))
+    distances = np.zeros(shape=(n_user, n_ap))
+    for i in range(n_user):
+        for j in range(n_ap):
+            if is_wrapped:
+                dx = abs(user_pos_3d[i, 0] - ap_pos_3d[j, 0])
+                dx = min(dx, AREA_SIZE[0]-dx)
+                dy = abs(user_pos_3d[i, 1] - ap_pos_3d[j, 1])
+                dy = min(dy, AREA_SIZE[1]-dy)
+                dz = user_pos_3d[i, 2] - ap_pos_3d[j, 2]
+                xyz_offsets = np.array([dx, dy, dz])
+            else:
+                xyz_offsets = user_pos_3d[i] - ap_pos_3d[j]
+            distances[i, j] = np.linalg.norm(xyz_offsets, 2)
+    return distances
+
+
+def get_path_loss(user2ap_distances):
+    n_user, n_ap = np.shape(user2ap_distances)
+    path_loss = np.zeros(shape=(n_user, n_ap))
+    for i in range(n_user):
+        for j in range(n_ap):
+            dmk = user2ap_distances[i, j]
+            path_loss[i, j] = - L - 15*np.log10(max(D1, dmk)) \
+                                  - 20*np.log10(max(D0, dmk))
+    return path_loss
+
+
+def get_largeScale_coeff(path_loss):
+    z = np.random.normal(size=np.shape(path_loss))
+    return path_loss*10**(STD_SH*z/10)
+
+
+def get_worst_users(beta, n_pilot):
+    n_user, _ = np.shape(beta)
+    # potential_rate = np.zeros(n_user)
+    # for k in range(n_user):
+    #     itself = beta[k]
+    #     itself = np.tile(itself, n_user-1).reshape(n_user-1, -1)
+    #     others = np.delete(beta, k, axis=0)
+    #     # potential_rate[k] = np.sum(itself*others)
+    potential_rate = np.sum(beta, axis=1)
+    return np.argsort(potential_rate)[:n_pilot]
+
+
+def preallocate(worst_users, n_pilot):
+    pilots = np.zeros(n_pilot, dtype=int)
+    for i, user in enumerate(worst_users):
+        pilots[i] = user
+    return pilots
+
+
+def get_x(n_user, worst_users):
+    all_users = np.linspace(0, n_user-1, n_user, dtype=int)
+    x = list(set(all_users) - set(worst_users))
+    n_pilot = len(worst_users)
+    if n_user % n_pilot != 0:
+        print("ERROR: invalid (n_user, n_pilot) comination")
+    else:
+        n_group_member = int(n_user / n_pilot)
+        return np.array(list(combinations(x, n_group_member-1)))
+
+
+def get_rate(k, roommates, beta):
+    return 0.9*(np.log2(1+get_sinr(k, roommates, beta)))
+
+
+def get_sinr(user, roommates, beta):
+    gamma = get_gamma(user, roommates, beta)
+    ds = np.sum(gamma)**2
+    bu = np.sum(gamma*np.sum(beta[roommates], axis=0))
+    ui = np.sum(gamma*np.sum(beta[roommates], axis=0)/beta[user]) ** 2
+    return ds / (bu + ui + np.sum(gamma))
+
+
+def get_gamma(user, roommates, beta):
+    return np.sqrt(20)*beta[user]*get_c(user, roommates, beta)
+
+
+def get_c(user, roommates, beta):
+    return beta[user] / (np.sqrt(20)*(np.sum(beta[roommates], axis=0))+1)
 
 
 def get_neighbor_indices(x, idx):
-    # Neighbors of a single user node
-    if type(x[idx]) == int:
-        neighbor_idx = []
-        for i in range(len(x)):
-            if type(x[i]) == list and x[idx] in x[i]:
-                neighbor_idx.append(i)
-        return neighbor_idx
+    users = x[idx]
+    neighbor_idx = []
+    for i in range(len(x)):
+        if len(np.intersect1d(users, x[i])):
+            neighbor_idx.append(i)
+    if idx in neighbor_idx:
+        neighbor_idx.remove(idx)
+    if idx in neighbor_idx:
+        neighbor_idx.remove(idx)
 
-    # Neighbors of user pair node
-    else:
-        user1 = x[idx][0]
-        user2 = x[idx][1]
-        neighbor_idx_user1 = []
-        neighbor_idx_user2 = []
-        for i in range(len(x)):
-            if type(x[i]) == list and user1 in x[i]:
-                neighbor_idx_user1.append(i)
-            if type(x[i]) == list and user2 in x[i]:
-                neighbor_idx_user2.append(i)
-        if idx in neighbor_idx_user1:
-            neighbor_idx_user1.remove(idx)
-        if idx in neighbor_idx_user2:
-            neighbor_idx_user2.remove(idx)
-
-        neighbor_idx_both = neighbor_idx_user1 + neighbor_idx_user2
-        neighbor_idx_both.sort()
-        return neighbor_idx_both
-
-
-def get_distances(user_positions, ap_positions):
-    n_ap = np.size(ap_positions, axis=0)
-    n_user = np.size(user_positions, axis=0)
-    xy_dist = np.zeros(shape=(n_ap, n_user, 2))
-    distances = np.zeros(shape=(n_ap, n_user))
-    angles = np.zeros(shape=(n_ap, n_user))
-
-    for ap_idx, ap_position in enumerate(ap_positions):
-        xy_dist[ap_idx, :, :] = user_positions - ap_position
-        distances[ap_idx, :] = np.linalg.norm(
-            xy_dist[ap_idx, :, :], 2, axis=1)
-        angles[ap_idx, :] = np.arctan2(
-            xy_dist[ap_idx, :, 1], xy_dist[ap_idx, :, 0])
-    distances[:, :] = np.sqrt(
-        distances[:, :]**2 + AP_HEIGHT**2)
-    return distances, angles
-
-
-def get_x(user_coverages):
-    x_both = []
-    x_ap0 = []
-    x_ap1 = []
-    for i, user_is_in in enumerate(user_coverages):
-        if np.all(user_is_in):
-            x_both.append(i)
-        elif user_is_in[0] == True:
-            x_ap0.append(i)
-        elif user_is_in[1] == True:
-            x_ap1.append(i)
-    x = x_both
-    for i in x_ap0:
-        for j in x_ap1:
-            x.append([i, j])
-    return x
+    neighbor_idx.sort()
+    return neighbor_idx
 
 
 def get_subsets(x):
@@ -180,74 +179,36 @@ def get_subsets(x):
             if j not in i_and_i_neighbors:
                 j0.append(j)
         x_j0[i] = j0
-    
+
     return x_neighbors, x_j0
 
 
-def get_G(n_ap, n_user, n_resource):
-    G_anr = np.zeros(shape=(n_ap, n_user, n_resource))
-    h_real = np.random.normal(
-        loc=0, scale=np.sqrt(2)/2, size=(n_ap, n_user, n_resource))
-    h_imaginary = np.random.normal(
-        loc=0, scale=np.sqrt(2)/2, size=(n_ap, n_user, n_resource))
-    for r in range(n_resource):
-        G_anr[:, :, r] = h_real[:, :, r]**2 + h_imaginary[:, :, r]**2
-    return G_anr
-
-
-def get_y(x, ap2user_distances, n_resource, std_hat):
-    n_ap, n_user = np.shape(ap2user_distances)
-    G_anr = get_G(n_ap, n_user, n_resource)
-    ap_list = np.linspace(0, n_ap-1, n_ap, dtype=int)
-    ap_pair_list = np.array(list(permutations(ap_list, r=2)))
-    y = np.zeros(shape=(len(x), n_resource))
-
+def get_y(x, occupancy, n_pilot, beta):
+    y = np.zeros(shape=(len(x), n_pilot))
     for i in range(len(x)):
-        if i < n_user:
-            user = i
-            for r in range(n_resource):
-                sum_term = 0
-                for ap in range(n_ap):
-                    d_cube = ap2user_distances[ap, user]**3
-                    sum_term += G_anr[ap, user, r] / d_cube
-                y[i, r] = np.log2(1 + sum_term / (std_hat**2))
-        else:
-            user1, user2 = x[i]
-            for r in range(n_resource):
-                comparison_list = [] # for max {a,b} term
-                for ap_pair in ap_pair_list:
-                    ap1, ap2 = ap_pair
-                    snir1 = np.log2(
-                        1 + (G_anr[ap1, user1, r]/ap2user_distances[ap1, user1]**3)
-                            / (G_anr[ap2, user1, r]/ap2user_distances[ap2, user1]**3 + (std_hat**2)))
-                    snir2 = np.log2(
-                        1 + (G_anr[ap2, user2, r]/ap2user_distances[ap2, user2]**3)
-                            / (G_anr[ap1, user2, r]/ap2user_distances[ap1, user2]**3 + (std_hat**2)))
-                    comparison_list.append(snir1 + snir2)
-                y[i, r] = np.max(comparison_list)
+        for r in range(n_pilot):
+            roommates = np.concatenate(([occupancy[r]], x[i].reshape(-1)))
+            roommate_configs = np.array(list(combinations(roommates, len(roommates)-1)))
+            for comb in roommate_configs:
+                room_head = list(set(roommates)-set(comb))[0]
+                y[i, r] += get_rate(room_head, comb, beta)
     return y
 
 
 def plot_positions(user_positions, ap_positions,
-                   max_distance, save_path, seed):
+                   save_path, seed):
     fig, ax = plt.subplots()
-    bs_colors = ['red', 'green', 'blue', 'brown']
-    x_min, x_max, y_min, y_max = get_map_boundaries(
-        ap_positions, max_distance)
+    x_min, y_min = 0, 0
+    x_max, y_max = AREA_SIZE
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
     for i, ap_pos in enumerate(ap_positions):
         ax.plot(ap_pos[0], ap_pos[1], marker="D",
-                markersize=8, color=bs_colors[i],
+                markersize=8, color='blue',
                 label=f"$BS_{i}$")
-        circle = plt.Circle((ap_pos[0], ap_pos[1]),
-                            max_distance,
-                            color=bs_colors[i],
-                            fill=False)
-        ax.add_patch(circle)
     for i, user_pos in enumerate(user_positions):
         ax.plot(user_pos[0], user_pos[1],
-                marker=f"${i}$", markersize=8,
+                marker="o", markersize=8,
                 color='black')
     ax.grid()
     plt.gca().set_aspect('equal')
@@ -256,8 +217,5 @@ def plot_positions(user_positions, ap_positions,
     plt.show()
 
 
-if __name__=="__main__":
-    main(n_user=40, n_resource=20,
-         ap_positions=np.array([[0, 0], [10, 0]]),
-         max_distance=10, std_hat=3, seed=0,
-         save_path="debug")
+if __name__ == "__main__":
+    main(n_user=10, n_pilot=5, n_ap=5, seed=0, save_path="debug")
