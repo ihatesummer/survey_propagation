@@ -9,13 +9,13 @@ AREA_SIZE = (1000, 1000)  # meter
 AP_HEIGHT = 15  # meter
 USER_HEIGHT = 1.65  # meter
 STD_SH = 8  # dB
-CARRIER_FREQ = 1.9*(10**9) # Hz
+CARRIER_FREQ = 1.9*(10**3) # MHz
 L = 46.3 + 33.9*np.log10(CARRIER_FREQ) \
         - 13.82*np.log10(AP_HEIGHT) \
         - (1.1*np.log10(CARRIER_FREQ) - 0.7)*USER_HEIGHT \
         + 1.56*np.log10(CARRIER_FREQ) - 0.8
-D0, D1 = 10, 50  # mters
-RHO = 0.1 / (7.2*10**-13)
+D0, D1 = 10, 50  # meters
+OMEGA = 0.1 / (7.2*10**-13)
 
 np.set_printoptions(precision=2)
 
@@ -28,12 +28,14 @@ def main(n_user, n_pilot, n_ap, seed, save_path):
         user_positions, ap_positions, is_wrapped=True)
     path_loss = get_path_loss(user2ap_distances)
     beta = get_largeScale_coeff(path_loss)
+    print(beta)
     random_n_users = get_random_users(n_user, n_pilot)
     # worst_users = get_worst_users(beta, n_pilot)
     occupancy = preallocate(random_n_users, n_pilot)
     x = get_x(n_user, random_n_users)
     x_neighbors, x_j0 = get_subsets(x)
     y = get_y(x, occupancy, n_pilot, beta)
+    print("y\n",y)
     if save_path == "debug":
         plot_positions(user_positions, ap_positions,
                        save_path, seed)
@@ -41,14 +43,18 @@ def main(n_user, n_pilot, n_ap, seed, save_path):
         json.dump(x_neighbors, f, indent=2)
     with open(os.path.join(save_path, f"x_j0_{seed}.json"), 'w') as f:
         json.dump(x_j0, f, indent=2)
-    np.save(os.path.join(
-        save_path, f"user_positions_{seed}.npy"), user_positions)
-    np.save(os.path.join(
-        save_path, f"ap_positions_{seed}.npy"), ap_positions)
+    np.save(os.path.join(save_path, f"user_positions_{seed}.npy"), user_positions)
+    np.save(os.path.join(save_path, f"ap_positions_{seed}.npy"), ap_positions)
     np.save(os.path.join(save_path, f"occupancy_{seed}.npy"), occupancy)
     np.save(os.path.join(save_path, f"beta_{seed}.npy"), beta)
     np.save(os.path.join(save_path, f"x_{seed}.npy"), x)
     np.save(os.path.join(save_path, f"y_{seed}.npy"), y)
+    # np.savetxt(os.path.join(save_path, f"user_positions_{seed}.csv"), user_positions, delimiter=',')
+    # np.savetxt(os.path.join(save_path, f"ap_positions_{seed}.csv"), ap_positions, delimiter=',')
+    # np.savetxt(os.path.join(save_path, f"occupancy_{seed}.csv"), occupancy, delimiter=',')
+    # np.savetxt(os.path.join(save_path, f"beta_{seed}.csv"), beta, delimiter=',')
+    # np.savetxt(os.path.join(save_path, f"x_{seed}.csv"), x, delimiter=',')
+    # np.savetxt(os.path.join(save_path, f"y_{seed}.csv"), y, delimiter=',')
     np.savetxt(os.path.join(save_path, f"y_{seed}.csv"), y, delimiter=',')
 
 
@@ -97,7 +103,8 @@ def get_path_loss(user2ap_distances):
 
 def get_largeScale_coeff(path_loss):
     z = np.random.normal(size=np.shape(path_loss))
-    return path_loss*10**(STD_SH*z/10)
+    # return path_loss*10**(STD_SH*z/10)
+    return 10**((path_loss+STD_SH*z)/10)
 
 
 def get_random_users(n_user, n_pilot):
@@ -136,23 +143,25 @@ def get_x(n_user, worst_users):
 
 
 def get_rate(k, roommates, beta, n_pilot):
-    return (1-n_pilot/200)*(np.log2(1+get_sinr(k, roommates, beta)))
+    return (1-n_pilot/200)*(np.log2(1+get_sinr(k, roommates, beta, n_pilot)))
 
 
-def get_sinr(user, roommates, beta):
-    gamma = get_gamma(user, roommates, beta)
-    ds = np.sum(gamma)**2
-    bu = np.sum(gamma*np.sum(beta[roommates], axis=0))
-    ui = np.sum(gamma*np.sum(beta[roommates], axis=0)/beta[user]) ** 2
+def get_sinr(user, roommates, beta, n_pilot):
+    gamma = get_gamma(user, roommates, beta, n_pilot)
+    ds = OMEGA * np.sum(gamma)**2
+    bu = OMEGA * np.sum(gamma*np.sum(beta[roommates], axis=0))
+    ui = OMEGA * np.sum(gamma*np.sum(beta[roommates], axis=0)/beta[user]) ** 2
     return ds / (bu + ui + np.sum(gamma))
 
 
-def get_gamma(user, roommates, beta):
-    return np.sqrt(20)*beta[user]*get_c(user, roommates, beta)
+def get_gamma(user, roommates, beta, n_pilot):
+    return n_pilot*OMEGA * beta[user]**2 / (n_pilot*OMEGA*(np.sum(beta[roommates], axis=0))+1)
 
+# def get_gamma(user, roommates, beta, n_pilot):
+#     return np.sqrt(n_pilot*OMEGA)*beta[user]*get_c(user, roommates, beta, n_pilot)
 
-def get_c(user, roommates, beta):
-    return beta[user] / (np.sqrt(20)*(np.sum(beta[roommates], axis=0))+1)
+# def get_c(user, roommates, beta, n_pilot):
+#     return np.sqrt(n_pilot*OMEGA) * beta[user] / (n_pilot*OMEGA*(np.sum(beta[roommates], axis=0))+1)
 
 
 def get_neighbor_indices(x, idx):
@@ -223,4 +232,4 @@ def plot_positions(user_positions, ap_positions,
 
 
 if __name__ == "__main__":
-    main(n_user=9, n_pilot=3, n_ap=100, seed=0, save_path="debug")
+    main(n_user=9, n_pilot=3, n_ap=2, seed=0, save_path="debug")
