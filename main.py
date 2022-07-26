@@ -4,21 +4,22 @@ import hungarian as hh
 import greedy as gd
 import numpy as np
 import os
+from tqdm import tqdm
 
-N_REPEAT = 100
+N_REPEAT = 20
 AP_POSITIONS = np.array([[0, 0], [10, 0]])
 
 def main():
-    n_user_list = [75]
+    n_user_list = [9, 12]
     sum_rates = np.zeros(shape=(len(n_user_list), N_REPEAT))
     sum_rates_hh = np.zeros(shape=(len(n_user_list), N_REPEAT))
     sum_rates_gd = np.zeros(shape=(len(n_user_list), N_REPEAT))
     for i, n_user in enumerate(n_user_list):
         max_iter = n_user * 5
-        print("."*20 + f"n_user: {n_user}" + "."*20)
+        # print("."*20 + f"n_user: {n_user}" + "."*20)
         save_path = make_folder(n_user)
         n_pilot=int(n_user/3)
-        for n_repeat in range(N_REPEAT):
+        for n_repeat in tqdm(range(N_REPEAT), desc=f"{n_user}users"):
             ss.main(n_user=n_user, n_pilot=n_pilot, n_ap=100,
                     seed=n_repeat, save_path=save_path)
             (convergence_time, n_iter,
@@ -29,10 +30,10 @@ def main():
                                                 save_path=save_path)
             sum_rates_gd[i, n_repeat] = gd.main(n_user=n_user, n_pilot=n_pilot,
                                                 seed=n_repeat, save_path=save_path)
-            print(f"Simul#{n_repeat}({convergence_time: .2f}s/{n_iter}itr) - " +
-                  f"SP: {sum_rates[i, n_repeat]:.4f}, " + 
-                  f"HH:{sum_rates_hh[i, n_repeat]:.4f}, " +
-                  f"GD:{sum_rates_gd[i, n_repeat]:.4f}")
+            # print(f"Simul#{n_repeat} - " +
+            #       f"SP: {sum_rates[i, n_repeat]:.2f}({convergence_time: .2f}s/{n_iter}itr), " + 
+            #       f"HH:{sum_rates_hh[i, n_repeat]:.2f}, " +
+            #       f"GD:{sum_rates_gd[i, n_repeat]:.2f}")
     
             np.save(f"sumrates_SP_{n_user}users.npy", sum_rates[i, :n_repeat+1])
             np.save(f"sumrates_HH_{n_user}users.npy", sum_rates_hh[i, :n_repeat+1])

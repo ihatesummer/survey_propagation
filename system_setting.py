@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import json
 import os
-from itertools import permutations, combinations
+from itertools import combinations
 
 
 AREA_SIZE = (1000, 1000)  # meter
@@ -28,10 +28,10 @@ def main(n_user, n_pilot, n_ap, seed, save_path):
         user_positions, ap_positions, is_wrapped=True)
     path_loss = get_path_loss(user2ap_distances)
     beta = get_largeScale_coeff(path_loss)
-    prealloced_users = get_random_users(n_user, n_pilot)
+    random_n_users = get_random_users(n_user, n_pilot)
     # worst_users = get_worst_users(beta, n_pilot)
-    occupancy = preallocate(prealloced_users, n_pilot)
-    x = get_x(n_user, prealloced_users)
+    occupancy = preallocate(random_n_users, n_pilot)
+    x = get_x(n_user, random_n_users)
     x_neighbors, x_j0 = get_subsets(x)
     y = get_y(x, occupancy, n_pilot, beta)
     if save_path == "debug":
