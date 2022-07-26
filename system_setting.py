@@ -1,4 +1,3 @@
-from xml.dom.minidom import ReadOnlySequentialNamedNodeMap
 import numpy as np
 import matplotlib.pyplot as plt
 import json
@@ -13,7 +12,7 @@ STD_SH = 8  # dB
 CARRIER_FREQ = 1.9*(10**9) # Hz
 L = 46.3 + 33.9*np.log10(CARRIER_FREQ) \
         - 13.82*np.log10(AP_HEIGHT) \
-        - (1.1*np.log10(CARRIER_FREQ)-0.7)*USER_HEIGHT \
+        - (1.1*np.log10(CARRIER_FREQ) - 0.7)*USER_HEIGHT \
         + 1.56*np.log10(CARRIER_FREQ) - 0.8
 D0, D1 = 10, 50  # mters
 RHO = 0.1 / (7.2*10**-13)
@@ -29,9 +28,10 @@ def main(n_user, n_pilot, n_ap, seed, save_path):
         user_positions, ap_positions, is_wrapped=True)
     path_loss = get_path_loss(user2ap_distances)
     beta = get_largeScale_coeff(path_loss)
-    worst_users = get_worst_users(beta, n_pilot)
-    occupancy = preallocate(worst_users, n_pilot)
-    x = get_x(n_user, worst_users)
+    prealloced_users = get_random_users(n_user, n_pilot)
+    # worst_users = get_worst_users(beta, n_pilot)
+    occupancy = preallocate(prealloced_users, n_pilot)
+    x = get_x(n_user, prealloced_users)
     x_neighbors, x_j0 = get_subsets(x)
     y = get_y(x, occupancy, n_pilot, beta)
     if save_path == "debug":
@@ -100,6 +100,11 @@ def get_largeScale_coeff(path_loss):
     return path_loss*10**(STD_SH*z/10)
 
 
+def get_random_users(n_user, n_pilot):
+    user_list = np.linspace(0, n_user-1, n_user, dtype=int)
+    return np.random.choice(user_list, n_pilot)
+
+
 def get_worst_users(beta, n_pilot):
     n_user, _ = np.shape(beta)
     # potential_rate = np.zeros(n_user)
@@ -130,8 +135,8 @@ def get_x(n_user, worst_users):
         return np.array(list(combinations(x, n_group_member-1)))
 
 
-def get_rate(k, roommates, beta):
-    return 0.9*(np.log2(1+get_sinr(k, roommates, beta)))
+def get_rate(k, roommates, beta, n_pilot):
+    return (1-n_pilot/200)*(np.log2(1+get_sinr(k, roommates, beta)))
 
 
 def get_sinr(user, roommates, beta):
@@ -191,7 +196,7 @@ def get_y(x, occupancy, n_pilot, beta):
             roommate_configs = np.array(list(combinations(roommates, len(roommates)-1)))
             for comb in roommate_configs:
                 room_head = list(set(roommates)-set(comb))[0]
-                y[i, r] += get_rate(room_head, comb, beta)
+                y[i, r] += get_rate(room_head, comb, beta, n_pilot)
     return y
 
 
@@ -218,4 +223,4 @@ def plot_positions(user_positions, ap_positions,
 
 
 if __name__ == "__main__":
-    main(n_user=10, n_pilot=5, n_ap=5, seed=0, save_path="debug")
+    main(n_user=9, n_pilot=3, n_ap=100, seed=0, save_path="debug")

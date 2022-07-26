@@ -9,8 +9,8 @@ def main(n_pilot=3, seed=0):
     alpha_bar = np.load(os.path.join("debug", f"msg_alpha_bar.npy"))
     rho_tilde = np.load(os.path.join("debug", f"msg_rho_tilde.npy"))
     rho_bar = np.load(os.path.join("debug", f"msg_rho_tilde.npy"))
-    # show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar, n_pilot)
-    show_mp_traj_one(0, 0, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
+    show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar, n_pilot)
+    # show_mp_traj_one(0, 0, alpha_tilde, alpha_bar, rho_tilde, rho_bar)
 
 
 def show_mp_traj(x, alpha_tilde, alpha_bar, rho_tilde, rho_bar, n_pilot):

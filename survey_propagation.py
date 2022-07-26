@@ -174,6 +174,7 @@ def update_alpha(neighbor_mapping, x_j0, rho_tilde_now, rho_bar_now):
 def make_decision(x, alpha_tilde_now, alpha_bar_now,
                   rho_tilde_now, rho_bar_now):
     dim_x = len(x)
+    dim_r = np.size(alpha_tilde_now, axis=1)
     allocation = np.zeros(dim_x)
 
     b_tilde = alpha_tilde_now + rho_tilde_now
@@ -185,6 +186,10 @@ def make_decision(x, alpha_tilde_now, alpha_bar_now,
             # print(b_bar[i, :])
         else:
             allocation[i] = None
+    for r in range(dim_r):
+        if np.count_nonzero(allocation==r) == 0:
+            i_argmax = np.argmax(b_tilde[:, r])
+            allocation[i_argmax] = r
     return allocation
 
     # old
@@ -245,6 +250,6 @@ def get_sum_rate(y, converged_allocation):
 
 if __name__=="__main__":
     convergence_time, n_iter, sum_rate = main(
-        n_user=10, n_pilot=5, max_iter=100, damping=0.3,
+        n_user=9, n_pilot=3, max_iter=100, damping=0.3,
         converge_thresh=10**-2, seed=0, save_path="debug")
     print(f"converged in {convergence_time}s/{n_iter}itr")

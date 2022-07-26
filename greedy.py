@@ -13,7 +13,7 @@ def main(n_user, n_pilot, seed, save_path):
     allocation[0, :] = random_assignment(n_user, n_pilot)
     for t in range(1, MAX_ITER):
         allocation[t] = allocation[t-1]
-        current_rates = get_rates_all(allocation[t], beta)
+        current_rates = get_rates_all(allocation[t], beta, n_pilot)
         lowest_rate_user = np.argmin(current_rates)
         lowest_rate_user_alloc_pilot = allocation[t, lowest_rate_user]
         new_rsc = get_new_pilot(lowest_rate_user, lowest_rate_user_alloc_pilot, allocation[t], n_pilot, beta)
@@ -32,13 +32,13 @@ def random_assignment(n_user, n_pilot):
     return rand_assign
 
 
-def get_rates_all(allocation, beta):
+def get_rates_all(allocation, beta, n_pilot):
     rates = np.zeros(len(allocation))
     for i in range(len(allocation)):
         r = allocation[i]
         neighbors = np.argwhere(allocation==r).reshape(-1)
         neighbors = np.delete(neighbors, np.argwhere(neighbors==i))
-        rates[i] = get_rate(i, neighbors, beta)
+        rates[i] = get_rate(i, neighbors, beta, n_pilot)
     return rates
 
 
@@ -63,7 +63,7 @@ def get_sumrate_hung(current_alloc, n_pilot, beta):
         for comb in pair_configs:
             room_head = list(set(r_users)-set(comb))[0]
             if len(comb) != 0:
-                sumrate += get_rate(room_head, comb, beta)
+                sumrate += get_rate(room_head, comb, beta, n_pilot)
     return sumrate
 
 
