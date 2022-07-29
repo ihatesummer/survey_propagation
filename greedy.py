@@ -1,6 +1,6 @@
 import numpy as np
 import os
-from system_setting import get_rate
+from system_setting import get_throughput
 from itertools import combinations
 from hungarian import get_sumrate_hung as get_sumrate_greedy
 MAX_ITER = 10
@@ -38,7 +38,7 @@ def get_rates_all(allocation, beta, n_pilot):
         r = allocation[i]
         neighbors = np.argwhere(allocation==r).reshape(-1)
         neighbors = np.delete(neighbors, np.argwhere(neighbors==i))
-        rates[i] = get_rate(i, neighbors, beta, n_pilot)
+        rates[i] = get_throughput(i, neighbors, beta, n_pilot)
     return rates
 
 
@@ -63,7 +63,7 @@ def get_sumrate_hung(current_alloc, n_pilot, beta):
         for comb in pair_configs:
             room_head = list(set(r_users)-set(comb))[0]
             if len(comb) != 0:
-                sumrate += get_rate(room_head, comb, beta, n_pilot)
+                sumrate += get_throughput(room_head, comb, beta, n_pilot)
     return sumrate
 
 

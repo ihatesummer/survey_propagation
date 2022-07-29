@@ -4,14 +4,23 @@ import time
 import os
 
 np.set_printoptions(precision=2)
-
+INFIN = 10**60
 
 def main(n_user, n_pilot, max_iter, damping, converge_thresh, seed, save_path):
     np.random.seed(seed)
+    tic_readfiles = time.time()
     x, neighbor_mapping, x_j0, y, y_normalizer, occupancy = read_files(save_path, seed)
+    print(y)
     # for idx, user_list in enumerate(x):
     #     print(f"index {idx}: user(s) {user_list}")
+    print("readfiles:", time.time()-tic_readfiles)
     dim_x = len(x)
+    tic_matrix = time.time()
+    (neighbor_mapping_matrix,
+     j_prime_matrix, j0_prime_matrix,
+     row_window, j0_window) = preCalculate_matrices(dim_x, n_pilot,
+                                                    neighbor_mapping, x_j0)
+    print("matrices calc:", time.time()-tic_matrix)
     alpha_tilde = np.zeros(shape=(max_iter, dim_x, n_pilot))
     alpha_bar = np.zeros(shape=(max_iter, dim_x, n_pilot))
     rho_tilde = np.zeros(shape=(max_iter, dim_x, n_pilot))
@@ -19,32 +28,37 @@ def main(n_user, n_pilot, max_iter, damping, converge_thresh, seed, save_path):
     allocation = np.zeros(shape=(max_iter, dim_x))
     tic = time.time()
     for t in range(1, max_iter):
+        # tic_rho = time.time()
         rho_tilde[t], rho_bar[t] = update_rho(y, alpha_tilde[t], alpha_bar[t])
         rho_tilde[t] = damping*rho_tilde[t-1] + (1-damping)*rho_tilde[t]
+        # print("rho:", time.time()-tic_rho)
         rho_bar[t] = damping*rho_bar[t-1] + (1-damping)* rho_bar[t]
         if t < max_iter-1:
-            alpha_tilde[t+1], alpha_bar[t+1] = update_alpha(neighbor_mapping, x_j0, rho_tilde[t], rho_bar[t])
+            # tic_alpha = time.time()
+            alpha_tilde[t+1], alpha_bar[t+1] = update_alpha(
+                neighbor_mapping_matrix, j_prime_matrix, j0_prime_matrix,
+                row_window, j0_window, rho_tilde[t], rho_bar[t])
             alpha_tilde[t+1] = damping*alpha_tilde[t] + (1-damping)*alpha_tilde[t+1]
+            # print("alpha:", time.time()-tic_alpha)
             alpha_bar[t+1] = damping*alpha_bar[t] + (1-damping)*alpha_bar[t+1]
         if save_path=="debug":
             allocation[t] = make_decision(x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
             print_allocation(x, t, allocation[t], n_user, n_pilot, occupancy)
-            sum_rate = get_sum_rate(y, allocation[t]) * y_normalizer
-            print(f"Sumrate: {sum_rate}")
+            sum_throughput = get_sum_throughput_Mbps(y, allocation[t]) * y_normalizer
+            print(f"SumThroughput: {sum_throughput:.2f} Mbps")
         is_converged = check_convergence(
             t, alpha_tilde, alpha_bar, rho_tilde, rho_bar, converge_thresh)
         if is_converged:
             convergence_time = time.time() - tic
             allocation[t] = make_decision(
                 x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
-            sum_rate = get_sum_rate(y, allocation[t]) * y_normalizer
+            sum_throughput = get_sum_throughput_Mbps(y, allocation[t]) * y_normalizer
             if save_path=="debug":
                 np.save(os.path.join(save_path, "msg_alpha_tilde.npy"), alpha_tilde[1:t+1, :, :])
                 np.save(os.path.join(save_path, "msg_alpha_bar.npy"), alpha_bar[1:t+1, :, :])
                 np.save(os.path.join(save_path, "msg_rho_tilde.npy"), rho_tilde[1:t+1, :, :])
                 np.save(os.path.join(save_path, "msg_rho_bar.npy"), rho_bar[1:t+1, :, :])
-                # np.save("allocation.npy", allocation[t, :])
-            return convergence_time, t, sum_rate
+            return convergence_time, t, sum_throughput
     return time.time() - tic, max_iter, None
 
 
@@ -61,12 +75,29 @@ def read_files(save_path, seed):
     return x, neighbor_mapping, x_j0, y, y_normalizer, occupancy
 
 
-def update_rho(y, alpha_tilde_now, alpha_bar_now):
-    dim_x, n_resource = np.shape(y)
-    rho_bar_now = np.zeros(shape=(dim_x, n_resource))
-    rho_tilde_now = np.zeros(shape=(dim_x, n_resource))
+def preCalculate_matrices(dim_x, n_pilot, neighbor_mapping, x_j0):
+    neighbor_mapping_matrix = np.zeros((dim_x, dim_x), dtype=int)
+    j0_prime_matrix = np.zeros((dim_x, dim_x, dim_x), dtype=int)
+    j0_window = np.zeros((dim_x, dim_x, n_pilot), dtype=int)
+    for i in range(dim_x):
+        neighbor_mapping_matrix[i, neighbor_mapping[i]] = 1
+        j0_window[i, x_j0[i], :] = 1
+        for j0 in x_j0[i]:
+            j0_prime = list(set(neighbor_mapping[j0]) - set(neighbor_mapping[i]))
+            j0_prime_matrix[i, j0, j0_prime] = 1
+    # print(neighbor_mapping_matrix)
+    j_prime_matrix = np.tile(neighbor_mapping_matrix, (dim_x, 1, 1))
+    col_window = 1 - np.tile(np.expand_dims(np.eye(dim_x, dtype=int), axis=1), (1, dim_x, 1))
+    j_prime_matrix[col_window==0] = 0
+    row_window = 1 - np.tile(np.expand_dims(np.eye(dim_x), axis=2), n_pilot)
+    return neighbor_mapping_matrix, j_prime_matrix, j0_prime_matrix, row_window, j0_window
 
-    for r in range(n_resource):
+def update_rho(y, alpha_tilde_now, alpha_bar_now):
+    dim_x, n_pilot = np.shape(y)
+    rho_bar_now = np.zeros(shape=(dim_x, n_pilot))
+    rho_tilde_now = np.zeros(shape=(dim_x, n_pilot))
+    for r in range(n_pilot):
+        tic = time.time()
         alpha_tilde_except_r = np.delete(alpha_tilde_now, r, axis=1)
         alpha_bar_except_r = np.delete(alpha_bar_now, r, axis=1)
         y_except_r = np.delete(y, r, axis=1)
@@ -76,98 +107,27 @@ def update_rho(y, alpha_tilde_now, alpha_bar_now):
             y_except_r + alpha_bar_except_r, axis=1)
     return rho_tilde_now, rho_bar_now
 
-    # old
-    for r in range(n_resource):
-        alpha_tilde_except_r = np.delete(alpha_tilde_now, r, axis=1)
-        alpha_bar_except_r = np.delete(alpha_bar_now, r, axis=1)
-        y_except_r = np.delete(y, r, axis=1)
-        rho_tilde_now[:, r] = y[:, r] - np.max(
-            y_except_r + alpha_tilde_except_r, axis=1)
-        rho_bar_now[:, r] = rho_tilde_now[:, r] + np.sum(
-            alpha_bar_except_r, axis=1) - y[:, r]
-    return rho_tilde_now, rho_bar_now
 
+def update_alpha(neighbor_mapping_matrix, j_prime_matrix, j0_prime_matrix,
+                 row_window, j0_window, rho_tilde_now, rho_bar_now):
+    dim_x, _ = np.shape(rho_tilde_now)
+    rho_BarMinusTilde_n = np.minimum(rho_bar_now - rho_tilde_now, 0)
+    rho_BarMinusTilde_p = np.maximum(rho_bar_now - rho_tilde_now, 0)
+    rho_bar_tile = np.tile(rho_bar_now, (dim_x, 1, 1))
+    rho_BarMinusTilde_p_tile = np.tile(rho_BarMinusTilde_p, (dim_x, 1, 1))
+    rho_BarMinusTilde_n_tile = np.tile(rho_BarMinusTilde_n, (dim_x, 1, 1))
+    j_prime_term_tile = np.matmul(j_prime_matrix, rho_BarMinusTilde_n_tile)
+    j0_prime_term_tile = np.matmul(j0_prime_matrix, rho_BarMinusTilde_n_tile)
+    
+    term1 = np.matmul(neighbor_mapping_matrix, rho_BarMinusTilde_n)
+    term2 = -rho_bar_tile + rho_BarMinusTilde_p_tile - j_prime_term_tile
+    term2[row_window==0] = INFIN
+    alpha_tilde_next = term1 + np.minimum(np.min(term2, axis=1), 0)
+    
+    term3 = -rho_bar_tile + rho_BarMinusTilde_p_tile - j0_prime_term_tile
+    term3[j0_window==0] = INFIN
+    alpha_bar_next = np.minimum(np.min(term3, axis=1), 0)
 
-def update_alpha(neighbor_mapping, x_j0, rho_tilde_now, rho_bar_now):
-    dim_x, n_resource = np.shape(rho_tilde_now)
-    alpha_tilde_next = np.zeros(shape=(dim_x, n_resource))
-    alpha_bar_next = np.zeros(shape=(dim_x, n_resource))
-
-    for i in range(dim_x):
-        # tilde
-        term1 = np.sum(
-            np.minimum(rho_bar_now[neighbor_mapping[i]] - rho_tilde_now[neighbor_mapping[i], :], 0), axis=0)
-        term2 = -np.delete(rho_bar_now, i, axis=0)
-        term3 = np.maximum(np.delete(rho_bar_now - rho_tilde_now, i, axis=0), 0)
-        j_list = np.delete(np.linspace(0, dim_x-1, dim_x, dtype=int), i)
-        term4 = np.zeros(shape=np.shape(term3))
-        for row, j in enumerate(j_list):
-            j_prime = list(set(neighbor_mapping[j]) - set([i]))
-            term4[row, :] = -np.sum(np.minimum(rho_bar_now[j_prime, :] - rho_tilde_now[j_prime, :], 0), axis=0)
-        alpha_tilde_next[i, :] = term1 + np.minimum(
-            np.min(term2 + term3 + term4, axis=0), 0)
-        
-        # bar
-        term1 = -rho_bar_now[x_j0[i], :]
-        term2 = np.maximum(rho_bar_now[x_j0[i], :] - rho_tilde_now[x_j0[i], :], 0)
-        term3 = np.zeros(shape=np.shape(term2))
-        for row, j0 in enumerate(x_j0[i]):
-            j0_prime = list(set(neighbor_mapping[j0]) - set(neighbor_mapping[i]))
-            term3[row, :] = -np.sum(np.minimum(rho_bar_now[j0_prime, :] - rho_tilde_now[j0_prime, :], 0), axis=0)
-        alpha_bar_next[i, :] = np.minimum(
-            np.min(term1 + term2 + term3, axis=0), 0)
-    return alpha_tilde_next, alpha_bar_next
-
-    # old
-    for i in range(dim_x):
-        j0_compare_alpha_tilde = np.zeros(n_resource) # placeholder
-        j0_compare_A_i_2 = np.zeros(n_resource) # placeholder
-        for j0 in x_j0[i]:
-            j0_prime = list(
-                set(neighbor_mapping[j0]) - set(neighbor_mapping[i]))
-            j0_prime_prime = list(
-                set(neighbor_mapping[i]) - set(neighbor_mapping[j0]) - set([j0]))
-            comparison_term = - rho_tilde_now[j0, :] \
-                 + np.maximum(rho_bar_now[j0, :], 0) \
-                 - np.sum(np.minimum(rho_bar_now[j0_prime, :], 0), axis=0)
-            j0_compare_alpha_tilde = np.row_stack(
-                (j0_compare_alpha_tilde, comparison_term))
-            j0_compare_A_i_2 = np.row_stack(
-                (j0_compare_A_i_2, - comparison_term 
-                 - np.sum(np.minimum(rho_bar_now[j0_prime_prime, :], 0), axis=0)))
-        j0_compare_alpha_tilde = np.delete(
-            j0_compare_alpha_tilde, 0, axis=0)  # remove placeholder
-        alpha_tilde_next[i, :] = np.minimum(
-            np.min(j0_compare_alpha_tilde, axis=0), 0)
-
-        jn_compare = np.zeros(n_resource) # placeholder, comparison list for A_ir(1)
-        for jn in neighbor_mapping[i]:
-            jn_prime = list(
-                set(neighbor_mapping[jn]) - set(neighbor_mapping[i]) - set([i]))
-            jn_prime_prime = list(
-                set(neighbor_mapping[i]) - set(neighbor_mapping[jn]) - set([jn]))
-            jn_compare = np.row_stack(
-                (jn_compare,
-                 + rho_tilde_now[jn, :]
-                 - rho_bar_now[jn, :]
-                 + np.sum(np.minimum(rho_bar_now[jn_prime, :], 0), axis=0)
-                 - np.sum(np.minimum(rho_bar_now[jn_prime_prime, :], 0), axis=0)))
-        jn_compare = np.delete(jn_compare, 0, axis=0) # remove placeholder
-        j0_compare_A_i_2 = np.delete(j0_compare_A_i_2, 0, axis=0)  # remove placeholder
-        if len(neighbor_mapping[i]) != 0:
-            A_i_1 = np.max(jn_compare, axis=0)
-            neg_sum_term = -np.sum(
-                np.minimum(rho_bar_now[neighbor_mapping[i], :], 0),
-                axis=0)
-        else:
-            A_i_1 = np.zeros(n_resource)
-            neg_sum_term = np.zeros(n_resource)
-        if len(x_j0[i]) != 0:
-            A_i_2 = np.max(j0_compare_A_i_2, axis=0)
-        else:
-            A_i_2 = np.zeros(n_resource)
-        alpha_bar_next[i, :] = np.maximum.reduce(
-            [A_i_1, A_i_2, neg_sum_term]) + alpha_tilde_next[i, :]
     return alpha_tilde_next, alpha_bar_next
 
 
@@ -180,28 +140,14 @@ def make_decision(x, alpha_tilde_now, alpha_bar_now,
     b_tilde = alpha_tilde_now + rho_tilde_now
     b_bar = alpha_bar_now + rho_bar_now
     for i in range(dim_x):
-        # print(i, np.max(b_tilde[i, :]))
         if np.max(b_tilde[i, :]) > 0:
             allocation[i] = np.argmax(b_bar[i, :])
-            # print(b_bar[i, :])
         else:
             allocation[i] = None
     for r in range(dim_r):
         if np.count_nonzero(allocation==r) == 0:
             i_argmax = np.argmax(b_tilde[:, r])
             allocation[i_argmax] = r
-    return allocation
-
-    # old
-    b_tilde = np.zeros(dim_x)
-    b_bar = np.zeros(dim_x)
-    for i in range(dim_x):
-        b_tilde[i] = np.max(rho_tilde_now[i] + alpha_tilde_now[i])
-        b_bar[i] = np.max(rho_bar_now[i] + alpha_bar_now[i])
-        if b_tilde[i] > b_bar[i]:
-            allocation[i] = np.argmax(rho_tilde_now[i] + alpha_tilde_now[i])
-        else:
-            allocation[i] = None
     return allocation
 
 
@@ -213,7 +159,7 @@ def print_allocation(x, t, current_allocation, n_user, n_pilot, occupancy):
     for i in range(len(x)):
         if not (np.isnan(current_allocation[i])):
             pilot_no = int(current_allocation[i])
-            print(f"idx {i}, user(s) {x[i]}, {occupancy[pilot_no]}: pilot {pilot_no}")
+            print(f"pilot#{pilot_no}: user {occupancy[pilot_no]} + {x[i]}(idx {i})")
             used_resource_list = np.append(used_resource_list,
                                            int(current_allocation[i]))
             assigned_user_list = np.append(assigned_user_list, x[i])
@@ -240,16 +186,16 @@ def check_convergence(t, alpha_tilde, alpha_bar, rho_tilde, rho_bar, converge_th
     return alpha_converged and rho_converged
 
 
-def get_sum_rate(y, converged_allocation):
+def get_sum_throughput_Mbps(y, converged_allocation):
     sum_rate = 0
     for i, r in enumerate(converged_allocation):
         if not (np.isnan(converged_allocation[i])):
             sum_rate += y[i, int(r)]
-    return sum_rate
+    return sum_rate * 10**-6
 
 
 if __name__=="__main__":
     convergence_time, n_iter, sum_rate = main(
-        n_user=9, n_pilot=3, max_iter=100, damping=0.3,
-        converge_thresh=10**-2, seed=0, save_path="debug")
-    print(f"converged in {convergence_time}s/{n_iter}itr")
+        n_user=30, n_pilot=10, max_iter=300, damping=0.3,
+        converge_thresh=10**-12, seed=0 , save_path="debug")
+    print(f"converged in {convergence_time:.2f}s/{n_iter}itr")

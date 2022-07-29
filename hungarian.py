@@ -2,7 +2,7 @@ import numpy as np
 import os
 import json
 from scipy.optimize import linear_sum_assignment
-from system_setting import get_rate
+from system_setting import get_throughput
 from itertools import combinations
 MAX_ITER = 5
 
@@ -62,7 +62,7 @@ def get_y_hung(n_pilot, neighbors, non_neighbors, current_allocation, beta):
     for i, user in enumerate(neighbors):
         for r in range(n_pilot):
             roommates = non_neighbors[np.argwhere(alloc==r).reshape(-1)]
-            y[i, r] = get_rate(user, roommates, beta, n_pilot)
+            y[i, r] = get_throughput(user, roommates, beta, n_pilot)
     return y
 
 
@@ -76,7 +76,7 @@ def get_sumrate_hung(current_alloc, n_pilot, beta):
         for comb in pair_configs:
             room_head = list(set(r_users)-set(comb))[0]
             if len(comb) != 0:
-                sumrate += get_rate(room_head, comb, beta, n_pilot)
+                sumrate += get_throughput(room_head, comb, beta, n_pilot)
     return sumrate
 
 

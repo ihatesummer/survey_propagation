@@ -14,8 +14,9 @@ L = 46.3 + 33.9*np.log10(CARRIER_FREQ) \
         - 13.82*np.log10(AP_HEIGHT) \
         - (1.1*np.log10(CARRIER_FREQ) - 0.7)*USER_HEIGHT \
         + 1.56*np.log10(CARRIER_FREQ) - 0.8
-D0, D1 = 10, 50  # meters
+D0, D1 = 0.01, 0.05  # km
 OMEGA = 0.1 / (7.2*10**-13)
+BW = 20*10**6
 
 np.set_printoptions(precision=2)
 
@@ -26,16 +27,16 @@ def main(n_user, n_pilot, n_ap, seed, save_path):
     ap_positions = generate_positions(n_ap)
     user2ap_distances = get_distances(
         user_positions, ap_positions, is_wrapped=True)
+    user2ap_distances /= 1000 # km
     path_loss = get_path_loss(user2ap_distances)
     beta = get_largeScale_coeff(path_loss)
-    print(beta)
     random_n_users = get_random_users(n_user, n_pilot)
     # worst_users = get_worst_users(beta, n_pilot)
     occupancy = preallocate(random_n_users, n_pilot)
     x = get_x(n_user, random_n_users)
     x_neighbors, x_j0 = get_subsets(x)
     y = get_y(x, occupancy, n_pilot, beta)
-    print("y\n",y)
+    print(y)
     if save_path == "debug":
         plot_positions(user_positions, ap_positions,
                        save_path, seed)
@@ -97,7 +98,7 @@ def get_path_loss(user2ap_distances):
         for j in range(n_ap):
             dmk = user2ap_distances[i, j]
             path_loss[i, j] = - L - 15*np.log10(max(D1, dmk)) \
-                                  - 20*np.log10(max(D0, dmk))
+                - 20*np.log10(max(D0, dmk))
     return path_loss
 
 
@@ -142,15 +143,17 @@ def get_x(n_user, worst_users):
         return np.array(list(combinations(x, n_group_member-1)))
 
 
-def get_rate(k, roommates, beta, n_pilot):
-    return (1-n_pilot/200)*(np.log2(1+get_sinr(k, roommates, beta, n_pilot)))
+def get_throughput(k, roommates, beta, n_pilot):
+    return BW * (1-n_pilot/200)*(np.log2(1+get_sinr(k, roommates, beta, n_pilot)))
 
 
 def get_sinr(user, roommates, beta, n_pilot):
     gamma = get_gamma(user, roommates, beta, n_pilot)
     ds = OMEGA * np.sum(gamma)**2
-    bu = OMEGA * np.sum(gamma*np.sum(beta[roommates], axis=0))
-    ui = OMEGA * np.sum(gamma*np.sum(beta[roommates], axis=0)/beta[user]) ** 2
+    bu = OMEGA * np.sum(gamma*np.sum(beta, axis=0))
+    ui = 0
+    for roommate in roommates:
+        ui += OMEGA * np.sum(gamma/beta[user] * beta[roommate]) ** 2
     return ds / (bu + ui + np.sum(gamma))
 
 
@@ -205,7 +208,7 @@ def get_y(x, occupancy, n_pilot, beta):
             roommate_configs = np.array(list(combinations(roommates, len(roommates)-1)))
             for comb in roommate_configs:
                 room_head = list(set(roommates)-set(comb))[0]
-                y[i, r] += get_rate(room_head, comb, beta, n_pilot)
+                y[i, r] += get_throughput(room_head, comb, beta, n_pilot)
     return y
 
 
@@ -232,4 +235,4 @@ def plot_positions(user_positions, ap_positions,
 
 
 if __name__ == "__main__":
-    main(n_user=9, n_pilot=3, n_ap=2, seed=0, save_path="debug")
+    main(n_user=30, n_pilot=10, n_ap=100, seed=0, save_path="debug")
