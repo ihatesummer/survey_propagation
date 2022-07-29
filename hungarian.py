@@ -31,7 +31,7 @@ def main(n_user, n_pilot, seed, save_path):
             n_identical_assignment += 1
             if n_identical_assignment > 10:
                 break
-    sumrate = get_sumrate_hung(allocation[t], n_pilot, beta)
+    sumrate = get_sumThroughput_hung_Mbps(allocation[t], n_pilot, beta)
     return sumrate
 
 
@@ -66,7 +66,7 @@ def get_y_hung(n_pilot, neighbors, non_neighbors, current_allocation, beta):
     return y
 
 
-def get_sumrate_hung(current_alloc, n_pilot, beta):
+def get_sumThroughput_hung_Mbps(current_alloc, n_pilot, beta):
     sumrate = 0
     for r in range(n_pilot):
         r_users = np.argwhere(current_alloc==r).reshape(-1)
@@ -77,11 +77,11 @@ def get_sumrate_hung(current_alloc, n_pilot, beta):
             room_head = list(set(r_users)-set(comb))[0]
             if len(comb) != 0:
                 sumrate += get_throughput(room_head, comb, beta, n_pilot)
-    return sumrate
+    return sumrate*10**-6
 
 
 if __name__=="__main__":
     sum_rate = main(
         n_user=10, n_pilot=5,
         seed=0, save_path="debug")
-    print(f"Hungarian sumrate: {sum_rate}s")
+    print(f"Hungarian sumrate: {sum_rate}Mbps")

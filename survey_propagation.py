@@ -7,20 +7,19 @@ np.set_printoptions(precision=2)
 INFIN = 10**60
 
 def main(n_user, n_pilot, max_iter, damping, converge_thresh, seed, save_path):
-    np.random.seed(seed)
+    # np.random.seed(seed)
     tic_readfiles = time.time()
     x, neighbor_mapping, x_j0, y, y_normalizer, occupancy = read_files(save_path, seed)
-    print(y)
     # for idx, user_list in enumerate(x):
     #     print(f"index {idx}: user(s) {user_list}")
-    print("readfiles:", time.time()-tic_readfiles)
+    # print("readfiles:", time.time()-tic_readfiles)
     dim_x = len(x)
-    tic_matrix = time.time()
+    # tic_matrix = time.time()
     (neighbor_mapping_matrix,
      j_prime_matrix, j0_prime_matrix,
      row_window, j0_window) = preCalculate_matrices(dim_x, n_pilot,
                                                     neighbor_mapping, x_j0)
-    print("matrices calc:", time.time()-tic_matrix)
+    # print("matrices calc:", time.time()-tic_matrix)
     alpha_tilde = np.zeros(shape=(max_iter, dim_x, n_pilot))
     alpha_bar = np.zeros(shape=(max_iter, dim_x, n_pilot))
     rho_tilde = np.zeros(shape=(max_iter, dim_x, n_pilot))
@@ -196,6 +195,6 @@ def get_sum_throughput_Mbps(y, converged_allocation):
 
 if __name__=="__main__":
     convergence_time, n_iter, sum_rate = main(
-        n_user=30, n_pilot=10, max_iter=300, damping=0.3,
-        converge_thresh=10**-12, seed=0 , save_path="debug")
+        n_user=12, n_pilot=4, max_iter=300, damping=0.3,
+        converge_thresh=10**-2, seed=0 , save_path="debug")
     print(f"converged in {convergence_time:.2f}s/{n_iter}itr")

@@ -1,8 +1,7 @@
 import numpy as np
 import os
 from system_setting import get_throughput
-from itertools import combinations
-from hungarian import get_sumrate_hung as get_sumrate_greedy
+from hungarian import get_sumThroughput_hung_Mbps as get_sumThroughput_greedy_Mbps
 MAX_ITER = 10
 
 def main(n_user, n_pilot, seed, save_path):
@@ -18,8 +17,8 @@ def main(n_user, n_pilot, seed, save_path):
         lowest_rate_user_alloc_pilot = allocation[t, lowest_rate_user]
         new_rsc = get_new_pilot(lowest_rate_user, lowest_rate_user_alloc_pilot, allocation[t], n_pilot, beta)
         allocation[t, lowest_rate_user] = new_rsc
-        sumrate = get_sumrate_greedy(allocation[t], n_pilot, beta)
-    return sumrate
+        sumThroughput = get_sumThroughput_greedy_Mbps(allocation[t], n_pilot, beta)
+    return sumThroughput
 
 
 def random_assignment(n_user, n_pilot):
@@ -55,20 +54,8 @@ def get_new_pilot(lowest_user, lowest_pilot, allocation, n_pilot, beta):
     return np.argmin(np.abs(pilot_comparison))
 
 
-def get_sumrate_hung(current_alloc, n_pilot, beta):
-    sumrate = 0
-    for r in range(n_pilot):
-        r_users = np.argwhere(current_alloc==r).reshape(-1)
-        pair_configs = np.array(list(combinations(r_users, len(r_users)-1)))
-        for comb in pair_configs:
-            room_head = list(set(r_users)-set(comb))[0]
-            if len(comb) != 0:
-                sumrate += get_throughput(room_head, comb, beta, n_pilot)
-    return sumrate
-
-
 if __name__=="__main__":
     sum_rate = main(
         n_user=9, n_pilot=3,
         seed=0, save_path="debug")
-    print(f"Hungarian sumrate: {sum_rate}s")
+    print(f"Greedy sumThroughput: {sum_rate}Mbps")
