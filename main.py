@@ -32,7 +32,7 @@ def main():
 
             (convergence_time, n_iter,
              sumrate_log_sp[i, n_repeat]) = sp.main(nUser, nPilot, max_iter,
-                                               damping=0.3, converge_thresh=10**-2,
+                                               damping=0.5, converge_thresh=10**-2,
                                                seed=seed, save_path=save_path)
             sumrate_log_hh[i, n_repeat] = hh.main(nUser, nPilot, seed, save_path)
             sumrate_log_gd[i, n_repeat] = gd.main(nUser, nPilot, seed, save_path)

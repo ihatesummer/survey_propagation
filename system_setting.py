@@ -225,14 +225,14 @@ def plot_positions(user_positions, ap_positions, occupancy,
         ax.text(user_positions[occupancy[i], 0]+1, user_positions[occupancy[i], 1]-5,
                 'pilot'+str(i), fontsize=12, color='tab:red')
 
-    ax.grid()
-    ax.legend(loc='upper left', ncol=1)
+    ax.grid(alpha=0.5)
+    ax.legend(loc='upper center', ncol=2, bbox_to_anchor=(0.5, 1.1))
     plt.gca().set_aspect('equal')
-    plt.tight_layout()
+    # plt.tight_layout()
     plt.savefig(os.path.join(save_path, f"seed{seed}-pos.png"))
     plt.show()
     plt.close()
 
 
 if __name__ == "__main__":
-    main(nUser=9, nPilot=3, nAP=100, seed=0, save_path="debug")
+    main(nUser=9, nPilot=3, nAP=100, seed=9, save_path="debug")

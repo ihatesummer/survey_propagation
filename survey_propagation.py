@@ -220,5 +220,5 @@ def get_sum_throughput_Mbps(y, converged_allocation):
 
 
 if __name__=="__main__":
-    main(nUser=9, nPilot=3, max_iter=100, damping=0.3,
-         converge_thresh=10**-2, seed=0, save_path="debug")
+    main(nUser=9, nPilot=3, max_iter=100, damping=0.5,
+         converge_thresh=10**-2, seed=9, save_path="debug")
