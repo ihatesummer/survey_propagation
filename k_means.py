@@ -6,9 +6,9 @@ KP = 1000
 
 def main(n_user, n_pilot, seed, save_path):
     np.random.seed(seed)
-    user_positions = np.load(os.path.join(save_path, f"user_positions_{seed}.npy"))
-    ap_positions = np.load(os.path.join(save_path, f"ap_positions_{seed}.npy"))
-    beta = np.load(os.path.join(save_path, f"beta_{seed}.npy"))
+    user_positions = np.load(os.path.join(save_path, f"seed{seed}-user_pos.npy"))
+    ap_positions = np.load(os.path.join(save_path, f"seed{seed}-ap_pos.npy"))
+    beta = np.load(os.path.join(save_path, f"seed{seed}-beta.npy"))
     n_centroids = int(n_user / n_pilot)
     points_x = np.random.uniform(0, AREA_SIZE[0], KP)
     points_y = np.random.uniform(0, AREA_SIZE[1], KP)

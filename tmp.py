@@ -1,3 +1,1 @@
-from main import make_folder
-
-make_folder(2)
+print(1 == 0 == 0 == 0)

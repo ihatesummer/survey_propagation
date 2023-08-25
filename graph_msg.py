@@ -4,7 +4,7 @@ import os
 
 
 def main(n_pilot=3, seed=0):
-    x = np.load(os.path.join("debug", f"x_{seed}.npy"))
+    x = np.load(os.path.join("debug", f"seed{seed}-x.npy"))
     alpha_tilde = np.load(os.path.join("debug", f"msg_alpha_tilde.npy"))
     alpha_bar = np.load(os.path.join("debug", f"msg_alpha_bar.npy"))
     rho_tilde = np.load(os.path.join("debug", f"msg_rho_tilde.npy"))

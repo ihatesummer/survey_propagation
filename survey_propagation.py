@@ -6,69 +6,89 @@ import os
 np.set_printoptions(precision=2)
 INFIN = 10**60
 
-def main(n_user, n_pilot, max_iter, damping, converge_thresh, seed, save_path):
-    # np.random.seed(seed)
-    tic_readfiles = time.time()
+def main(nUser, nPilot, max_iter, damping, converge_thresh, seed, save_path):
+    if save_path == "debug":
+        bDebug = True
+    else:
+        bDebug = False
+
     x, neighbor_mapping, x_j0, y, y_normalizer, occupancy = read_files(save_path, seed)
     # for idx, user_list in enumerate(x):
     #     print(f"index {idx}: user(s) {user_list}")
-    # print("readfiles:", time.time()-tic_readfiles)
     dim_x = len(x)
-    # tic_matrix = time.time()
     (neighbor_mapping_matrix,
      j_prime_matrix, j0_prime_matrix,
-     row_window, j0_window) = preCalculate_matrices(dim_x, n_pilot,
+     row_window, j0_window) = preCalculate_matrices(dim_x, nPilot,
                                                     neighbor_mapping, x_j0)
-    # print("matrices calc:", time.time()-tic_matrix)
-    alpha_tilde = np.zeros(shape=(max_iter, dim_x, n_pilot))
-    alpha_bar = np.zeros(shape=(max_iter, dim_x, n_pilot))
-    rho_tilde = np.zeros(shape=(max_iter, dim_x, n_pilot))
-    rho_bar = np.zeros(shape=(max_iter, dim_x, n_pilot))
+
+    alpha_tilde = np.zeros(shape=(max_iter, dim_x, nPilot))
+    alpha_bar = np.zeros(shape=(max_iter, dim_x, nPilot))
+    rho_tilde = np.zeros(shape=(max_iter, dim_x, nPilot))
+    rho_bar = np.zeros(shape=(max_iter, dim_x, nPilot))
     allocation = np.zeros(shape=(max_iter, dim_x))
+
+    bFeasibleSolution_found = False
     tic = time.time()
     for t in range(1, max_iter):
-        # tic_rho = time.time()
+        if bDebug:
+            print("."*10 + f"t={t}" + "."*10)
         rho_tilde[t], rho_bar[t] = update_rho(y, alpha_tilde[t], alpha_bar[t])
         rho_tilde[t] = damping*rho_tilde[t-1] + (1-damping)*rho_tilde[t]
-        # print("rho:", time.time()-tic_rho)
         rho_bar[t] = damping*rho_bar[t-1] + (1-damping)* rho_bar[t]
         if t < max_iter-1:
-            # tic_alpha = time.time()
             alpha_tilde[t+1], alpha_bar[t+1] = update_alpha(
                 neighbor_mapping_matrix, j_prime_matrix, j0_prime_matrix,
                 row_window, j0_window, rho_tilde[t], rho_bar[t])
             alpha_tilde[t+1] = damping*alpha_tilde[t] + (1-damping)*alpha_tilde[t+1]
-            # print("alpha:", time.time()-tic_alpha)
             alpha_bar[t+1] = damping*alpha_bar[t] + (1-damping)*alpha_bar[t+1]
-        if save_path=="debug":
-            allocation[t] = make_decision(x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
-            print_allocation(x, t, allocation[t], n_user, n_pilot, occupancy)
+
+        allocation[t] = make_decision(x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
+        (nDuplicate_pilots,
+         nDuplicate_users,
+         nUnused_pilots,
+         nUnassigned_users) = evaluate_decision(x, occupancy, nUser, nPilot, allocation[t], bDebug)
+        if nDuplicate_pilots == nDuplicate_users == nUnused_pilots == nUnassigned_users == 0:
+        # if nDuplicate_pilots == nDuplicate_users == 0:
+            bFeasibleSolution_found = True
             sum_throughput = get_sum_throughput_Mbps(y, allocation[t]) * y_normalizer
-            print(f"SumThroughput: {sum_throughput:.2f} Mbps")
-        is_converged = check_convergence(
+        bConverged = check_convergence(
             t, alpha_tilde, alpha_bar, rho_tilde, rho_bar, converge_thresh)
-        if is_converged:
-            convergence_time = time.time() - tic
-            allocation[t] = make_decision(
-                x, alpha_tilde[t], alpha_bar[t], rho_tilde[t], rho_bar[t])
+        if bConverged:
             sum_throughput = get_sum_throughput_Mbps(y, allocation[t]) * y_normalizer
-            if save_path=="debug":
-                np.save(os.path.join(save_path, "msg_alpha_tilde.npy"), alpha_tilde[1:t+1, :, :])
-                np.save(os.path.join(save_path, "msg_alpha_bar.npy"), alpha_bar[1:t+1, :, :])
-                np.save(os.path.join(save_path, "msg_rho_tilde.npy"), rho_tilde[1:t+1, :, :])
-                np.save(os.path.join(save_path, "msg_rho_bar.npy"), rho_bar[1:t+1, :, :])
+            convergence_time = time.time() - tic
+            break
+    
+    if bDebug:
+        np.save(os.path.join(save_path, "msg_alpha_tilde.npy"), alpha_tilde)
+        np.save(os.path.join(save_path, "msg_alpha_bar.npy"), alpha_bar)
+        np.save(os.path.join(save_path, "msg_rho_tilde.npy"), rho_tilde)
+        np.save(os.path.join(save_path, "msg_rho_bar.npy"), rho_bar)
+        if bConverged:
+            print(f"Converged sumrate({t}itr): {sum_throughput:.2f}")
+        else:
+            if bFeasibleSolution_found:
+                print(f"Not converged, feasible sumrate: {sum_throughput:.2f}")
+            else:
+                print(f"Not converged, no feasible solution")
+        return None
+    else:
+        if bConverged:
             return convergence_time, t, sum_throughput
-    return time.time() - tic, max_iter, None
+        else:
+            if bFeasibleSolution_found:
+                return time.time() - tic, max_iter, sum_throughput
+            else:
+                return time.time() - tic, max_iter, None
 
 
 def read_files(save_path, seed):
-    with open(os.path.join(save_path, f"x_neighbors_{seed}.json"), 'r') as f:
+    with open(os.path.join(save_path, f"seed{seed}-x_neighbors.json"), 'r') as f:
         neighbor_mapping = json.load(f)
-    with open(os.path.join(save_path, f"x_j0_{seed}.json"), 'r') as f:
+    with open(os.path.join(save_path, f"seed{seed}-x_j0.json"), 'r') as f:
         x_j0 = json.load(f)
-    occupancy = np.load(os.path.join(save_path, f"occupancy_{seed}.npy"))
-    x = np.load(os.path.join(save_path, f"x_{seed}.npy"))
-    y = np.load(os.path.join(save_path, f"y_{seed}.npy"))
+    occupancy = np.load(os.path.join(save_path, f"seed{seed}-occupancy.npy"))
+    x = np.load(os.path.join(save_path, f"seed{seed}-x.npy"))
+    y = np.load(os.path.join(save_path, f"seed{seed}-y.npy"))
     y_normalizer = np.max(y)
     y = y / y_normalizer
     return x, neighbor_mapping, x_j0, y, y_normalizer, occupancy
@@ -150,27 +170,33 @@ def make_decision(x, alpha_tilde_now, alpha_bar_now,
     return allocation
 
 
-def print_allocation(x, t, current_allocation, n_user, n_pilot, occupancy):
-    print("."*10 + f"t={t}" + "."*10)
-    used_resource_count = 0
-    used_resource_list = np.array([], dtype=int)
-    assigned_user_list = np.array([], dtype=int)
-    for i in range(len(x)):
-        if not (np.isnan(current_allocation[i])):
-            pilot_no = int(current_allocation[i])
-            print(f"pilot#{pilot_no}: user {occupancy[pilot_no]} + {x[i]}(idx {i})")
-            used_resource_list = np.append(used_resource_list,
-                                           int(current_allocation[i]))
-            assigned_user_list = np.append(assigned_user_list, x[i])
-            used_resource_count += 1
-    used_resource_count_unique = np.size(np.unique(used_resource_list))
-    n_duplicate_resource = used_resource_count - used_resource_count_unique
-    assigned_user_count_unique = np.size(np.unique(assigned_user_list))
-    n_duplicate_user = np.size(assigned_user_list) - assigned_user_count_unique
-    print(f"#duplicate rsc: {n_duplicate_resource} || " + 
-          f"#duplicate usr: {n_duplicate_user}\n" + 
-          f"#unused rsc: {n_pilot-used_resource_count} || "
-          f"#unassigned usr: {n_user-n_pilot-assigned_user_count_unique}")
+def evaluate_decision(x, occupancy, nUser, nPilot, current_allocation, bDebug):
+    idx_alloc_group = np.argwhere(np.isnan(current_allocation)==False).flatten()
+    idx_alloc_pilot = current_allocation[idx_alloc_group].astype(int)
+    sorting_by_pilot = idx_alloc_pilot.argsort()
+    alloc_table = np.vstack((idx_alloc_pilot[sorting_by_pilot],
+                             idx_alloc_group[sorting_by_pilot]))
+    assigned_users = x[idx_alloc_group].flatten()
+
+    nPrealloc_users = len(occupancy)
+    nUnique_pilots = np.size(np.unique(idx_alloc_pilot))
+    nUnique_users = np.size(np.unique(assigned_users))
+    nDuplicate_pilots = len(idx_alloc_pilot) - nUnique_pilots
+    nDuplicate_users = len(assigned_users) - nUnique_users
+    nUnused_pilots = nPilot-len(idx_alloc_pilot)
+    nUnassigned_users = nUser-nPrealloc_users-nUnique_users
+    if bDebug:
+        for i in range(alloc_table.shape[1]):
+            pilot_no, assigned_group_idx = alloc_table[:, i]
+            preassigned_user_idx = occupancy[pilot_no]
+            print(f"Pilot{pilot_no}<= users {preassigned_user_idx}+"
+                    f"{x[assigned_group_idx]} (idx {assigned_group_idx})")
+        print(f"#duplicate pilot: {nDuplicate_pilots} || "
+              f"#duplicate user:  {nDuplicate_users}\n"
+              f"#unused pilot:    {nUnused_pilots} || "
+              f"#unassigned user: {nUnassigned_users}")
+
+    return nDuplicate_pilots, nDuplicate_users, nUnused_pilots, nUnassigned_users
 
 
 def check_convergence(t, alpha_tilde, alpha_bar, rho_tilde, rho_bar, converge_thresh):
@@ -194,7 +220,5 @@ def get_sum_throughput_Mbps(y, converged_allocation):
 
 
 if __name__=="__main__":
-    convergence_time, n_iter, sum_rate = main(
-        n_user=12, n_pilot=4, max_iter=300, damping=0.3,
-        converge_thresh=10**-2, seed=0 , save_path="debug")
-    print(f"converged in {convergence_time:.2f}s/{n_iter}itr")
+    main(nUser=9, nPilot=3, max_iter=100, damping=0.3,
+         converge_thresh=10**-2, seed=0, save_path="debug")

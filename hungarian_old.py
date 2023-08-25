@@ -7,7 +7,7 @@ from scipy.optimize import linear_sum_assignment
 
 def main(n_user, n_resource, max_distance, ap_positions, seed, save_path):
     np.random.seed(seed)
-    user_positions = np.load(os.path.join(save_path, f"user_positions_{seed}.npy"))
+    user_positions = np.load(os.path.join(save_path, f"seed{seed}-user_pos.npy"))
     ap2user_distances = np.load(os.path.join(save_path, f"ap2user_distances_{seed}.npy"))
     with open(os.path.join(save_path, f"x_{seed}.json"), 'r') as f:
         x = json.load(f)

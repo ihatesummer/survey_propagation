@@ -6,8 +6,8 @@ MAX_ITER = 10
 
 def main(n_user, n_pilot, seed, save_path):
     np.random.seed(seed)
-    user_positions = np.load(os.path.join(save_path, f"user_positions_{seed}.npy"))
-    beta = np.load(os.path.join(save_path, f"beta_{seed}.npy"))
+    user_positions = np.load(os.path.join(save_path, f"seed{seed}-user_pos.npy"))
+    beta = np.load(os.path.join(save_path, f"seed{seed}-beta.npy"))
     allocation = np.zeros(shape=(MAX_ITER, n_user), dtype=int)
     allocation[0, :] = random_assignment(n_user, n_pilot)
     for t in range(1, MAX_ITER):
